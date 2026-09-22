@@ -4,7 +4,7 @@
   "threatRadius": 6,
   "gangUpRadius": 3,
   "hitCooldown": 0.8,
-  "stalemateTimeout": 20,
+  "stalemateTimeout": 40,
   "separationRadius": 1.2,
   "wallMargin": 2.5,
   "weights": {

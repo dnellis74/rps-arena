@@ -171,11 +171,14 @@ function formatTime(t: number): string {
 
 function updateStatus(): void {
   const counts = countTeams(match.world)
+  const noHit = match.world.timeSinceHit
+  const timeout = data.tuning.stalemateTimeout
   statusEl.innerHTML = `
     seed <strong>${seed}</strong>
     · ${formatTime(match.world.elapsed)}
     · <span class="team-a">A ${counts.a}</span>
     / <span class="team-b">B ${counts.b}</span>
+    · no-hit ${noHit.toFixed(1)}/${timeout}s
     · ${modeLabel(mode)}
   `
 }
