@@ -11,6 +11,10 @@ export type BehaviorContext = {
 /**
  * v0 hand-written behavior.
  * Priority: gang-up → flee → seek → same-tier (HP advantage) → idle near teammates.
+ *
+ * Note on "keep clear": that steering only applies to same-tier enemies without an
+ * HP advantage (spec §4 same-tier fight). Prey is always Seek/engage — close to
+ * contact. Rock vs scissors is prey for rock, never keep-clear.
  */
 export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
   const { types, damage, tuning } = ctx
@@ -50,7 +54,7 @@ export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
     const same = obs.sameTier[0]
     if (same) {
       if (obs.hp > same.band.high) return dirToward(same)
-      // Keep clear of equal/stronger same-tier.
+      // Keep clear: same-tier without HP advantage only (not prey).
       if (same.dist < threatRadius) {
         return { x: -same.dx, y: -same.dy }
       }
@@ -93,20 +97,14 @@ function countGang(
   damage: DamageMatrix,
 ): number {
   let count = 0
-  // Self: relative to predator is -predator.dx/dy from self, dist = predator.dist
   if (predator.dist <= gangUpRadius) {
-    // Predator preys on self by definition (it's in predators list).
     count++
   }
   for (const mate of obs.teammates) {
-    // Does predator prey on mate?
     const predPreysOnMate =
       (damage[predator.type]?.[mate.type] ?? 0) >
       (damage[mate.type]?.[predator.type] ?? 0)
     if (!predPreysOnMate) continue
-    // Mate position relative to observer: (mate.dx, mate.dy)
-    // Predator relative to observer: (predator.dx, predator.dy)
-    // Dist mate→predator:
     const mdx = predator.dx - mate.dx
     const mdy = predator.dy - mate.dy
     if (Math.hypot(mdx, mdy) <= gangUpRadius) count++
