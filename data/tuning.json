@@ -1,0 +1,17 @@
+{
+  "arenaWidth": 16,
+  "arenaHeight": 25,
+  "threatRadius": 6,
+  "gangUpRadius": 3,
+  "hitCooldown": 0.8,
+  "stalemateTimeout": 20,
+  "separationRadius": 1.2,
+  "wallMargin": 2.5,
+  "weights": {
+    "intent": 1.0,
+    "separation": 1.4,
+    "walls": 2.0
+  },
+  "spawnJitter": 0.35,
+  "fixedDt": 0.016666666666666666
+}
