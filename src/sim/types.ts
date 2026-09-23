@@ -42,6 +42,8 @@ export type TuningData = {
    * ~2 circle widths (diameters); with radius 0.5 that is 2.0 units.
    */
   standoffDistance: number
+  /** Short-side puck diameters at max zoom-in (camera; render-only). */
+  maxZoomInPucksAcross: number
 }
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'

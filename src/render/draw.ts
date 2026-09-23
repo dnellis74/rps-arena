@@ -1,91 +1,46 @@
 import type { Match, PuckSnapshot } from '../sim/match.ts'
 import { buildObservation } from '../sim/perception.ts'
 import type { CombatMode, TeamId } from '../sim/types.ts'
+import {
+  minimapLayout,
+  visibleWorldRect,
+  worldToScreen,
+  type Camera,
+} from './camera.ts'
 
 const TEAM_FILL: Record<TeamId, string> = {
   0: '#2f6fed',
   1: '#e87a2a',
 }
 
-export type ViewTransform = {
-  scale: number
-  offsetX: number
-  offsetY: number
-  canvasW: number
-  canvasH: number
-}
-
-export function computeView(
-  canvasW: number,
-  canvasH: number,
-  arenaW: number,
-  arenaH: number,
-): ViewTransform {
-  const scale = Math.min(canvasW / arenaW, canvasH / arenaH)
-  const drawW = arenaW * scale
-  const drawH = arenaH * scale
-  return {
-    scale,
-    offsetX: (canvasW - drawW) / 2,
-    offsetY: (canvasH - drawH) / 2,
-    canvasW,
-    canvasH,
-  }
-}
-
-export function worldToScreen(
-  x: number,
-  y: number,
-  view: ViewTransform,
-  arenaH: number,
-): { x: number; y: number } {
-  // Y-up in sim (0 at bottom); canvas Y grows downward — flip.
-  return {
-    x: view.offsetX + x * view.scale,
-    y: view.offsetY + (arenaH - y) * view.scale,
-  }
-}
-
-export function screenToWorld(
-  sx: number,
-  sy: number,
-  view: ViewTransform,
-  arenaH: number,
-): { x: number; y: number } {
-  return {
-    x: (sx - view.offsetX) / view.scale,
-    y: arenaH - (sy - view.offsetY) / view.scale,
-  }
-}
-
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   match: Match,
   pucks: PuckSnapshot[],
-  view: ViewTransform,
+  cam: Camera,
   selectedId: number | null,
 ): void {
   const { tuning } = match.world
   const { arenaWidth: W, arenaHeight: H } = tuning
 
-  ctx.clearRect(0, 0, view.canvasW, view.canvasH)
+  ctx.clearRect(0, 0, cam.viewportW, cam.viewportH)
 
-  // Letterbox background
+  // Letterbox / off-arena background
   ctx.fillStyle = '#1a1c22'
-  ctx.fillRect(0, 0, view.canvasW, view.canvasH)
+  ctx.fillRect(0, 0, cam.viewportW, cam.viewportH)
 
   // Arena floor
-  const origin = worldToScreen(0, H, view, H)
+  const origin = worldToScreen(cam, 0, H)
   ctx.fillStyle = '#2a2e38'
-  ctx.fillRect(origin.x, origin.y, W * view.scale, H * view.scale)
+  ctx.fillRect(origin.x, origin.y, W * cam.scale, H * cam.scale)
 
   // Subtle thirds
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'
   ctx.lineWidth = 1
   for (let t = 1; t <= 2; t++) {
     const y = (H / 3) * t
-    const a = worldToScreen(0, y, view, H)
-    const b = worldToScreen(W, y, view, H)
+    const a = worldToScreen(cam, 0, y)
+    const b = worldToScreen(cam, W, y)
     ctx.beginPath()
     ctx.moveTo(a.x, a.y)
     ctx.lineTo(b.x, b.y)
@@ -97,22 +52,20 @@ export function drawFrame(
     const sel = pucks.find((p) => p.id === selectedId)
     if (sel) {
       const obs = buildObservation(match.world, selectedId, match.damage)
-      const from = worldToScreen(sel.x, sel.y, view, H)
+      const from = worldToScreen(cam, sel.x, sel.y)
       if (obs.prey[0]) {
         const t = worldToScreen(
+          cam,
           sel.x + obs.prey[0].dx,
           sel.y + obs.prey[0].dy,
-          view,
-          H,
         )
         strokeLine(ctx, from, t, 'rgba(80, 220, 120, 0.85)', 2)
       }
       if (obs.predators[0]) {
         const t = worldToScreen(
+          cam,
           sel.x + obs.predators[0].dx,
           sel.y + obs.predators[0].dy,
-          view,
-          H,
         )
         strokeLine(ctx, from, t, 'rgba(240, 70, 70, 0.85)', 2)
       }
@@ -120,8 +73,8 @@ export function drawFrame(
   }
 
   for (const p of pucks) {
-    const c = worldToScreen(p.x, p.y, view, H)
-    const r = p.radius * view.scale
+    const c = worldToScreen(cam, p.x, p.y)
+    const r = p.radius * cam.scale
 
     ctx.beginPath()
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2)
@@ -140,13 +93,65 @@ export function drawFrame(
     ctx.textBaseline = 'middle'
     ctx.fillText(p.glyph, c.x, c.y + 0.5)
 
-    // Tiny HP pip
     const hpFrac = p.hp / p.maxHp
     ctx.fillStyle = 'rgba(0,0,0,0.35)'
     ctx.fillRect(c.x - r, c.y + r + 2, r * 2, 3)
     ctx.fillStyle = hpFrac > 0.34 ? '#9fe870' : '#f0c040'
     ctx.fillRect(c.x - r, c.y + r + 2, r * 2 * hpFrac, 3)
   }
+
+  drawMinimap(ctx, cam, pucks)
+}
+
+function drawMinimap(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  pucks: PuckSnapshot[],
+): void {
+  const layout = minimapLayout(cam)
+  if (!layout) return
+
+  const { x, y, size } = layout
+  ctx.fillStyle = 'rgba(12, 14, 20, 0.72)'
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  // roundRect is widely supported; fall back to rect if missing.
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, size, size, 6)
+  } else {
+    ctx.rect(x, y, size, size)
+  }
+  ctx.fill()
+  ctx.stroke()
+
+  const fit = Math.min(size / cam.arenaW, size / cam.arenaH)
+  const drawW = cam.arenaW * fit
+  const drawH = cam.arenaH * fit
+  const ox = x + (size - drawW) / 2
+  const oy = y + (size - drawH) / 2
+
+  ctx.fillStyle = '#2a2e38'
+  ctx.fillRect(ox, oy, drawW, drawH)
+
+  for (const p of pucks) {
+    const px = ox + p.x * fit
+    const py = oy + (cam.arenaH - p.y) * fit
+    ctx.beginPath()
+    ctx.arc(px, py, Math.max(1.5, fit * 0.35), 0, Math.PI * 2)
+    ctx.fillStyle = TEAM_FILL[p.team]
+    ctx.fill()
+  }
+
+  const vis = visibleWorldRect(cam)
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'
+  ctx.lineWidth = 1.5
+  ctx.strokeRect(
+    ox + vis.x * fit,
+    oy + (cam.arenaH - vis.y - vis.h) * fit,
+    vis.w * fit,
+    vis.h * fit,
+  )
 }
 
 function strokeLine(

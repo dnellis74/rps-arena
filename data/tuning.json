@@ -1,6 +1,6 @@
 {
-  "arenaWidth": 16,
-  "arenaHeight": 25,
+  "arenaWidth": 48,
+  "arenaHeight": 75,
   "threatRadius": 6,
   "gangUpRadius": 3,
   "hitCooldown": 0.8,
@@ -15,5 +15,6 @@
   "spawnJitter": 0.35,
   "fixedDt": 0.016666666666666666,
   "attackOverFlee": 1.25,
-  "standoffDistance": 4.0
+  "standoffDistance": 4.0,
+  "maxZoomInPucksAcross": 16
 }
