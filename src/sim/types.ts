@@ -31,6 +31,19 @@ export type TuningData = {
   }
   spawnJitter: number
   fixedDt: number
+  /**
+   * When a predator is in threat range, still Seek if nearest prey distance is
+   * at most predatorDist * attackOverFlee. Slightly favors finishing kills over
+   * running from a more distant predator.
+   */
+  attackOverFlee: number
+  /**
+   * Preferred keep-clear range for same-tier without HP advantage.
+   * ~2 circle widths (diameters); with radius 0.5 that is 2.0 units.
+   */
+  standoffDistance: number
+  /** Short-side puck diameters at max zoom-in (camera; render-only). */
+  maxZoomInPucksAcross: number
 }
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'

@@ -12,12 +12,18 @@ import {
   type Match,
 } from './sim/index.ts'
 import {
-  computeView,
-  drawFrame,
-  hitTestPuck,
-  modeLabel,
+  centerOn,
+  createCamera,
+  minimapContains,
+  minimapLayout,
+  minimapScreenToWorld,
+  panByScreen,
   screenToWorld,
-} from './render/draw.ts'
+  setViewport,
+  zoomAt,
+  type Camera,
+} from './render/camera.ts'
+import { drawFrame, hitTestPuck, modeLabel } from './render/draw.ts'
 
 const data = loadGameData()
 const behavior = createV0Behavior({
@@ -25,6 +31,9 @@ const behavior = createV0Behavior({
   damage: data.damage,
   tuning: data.tuning,
 })
+
+const PUCK_DIAMETER = 2 * data.types.rock!.radius
+const TAP_SLOP_PX = 10
 
 type Speed = 0 | 1 | 4
 
@@ -51,6 +60,7 @@ let selectedId: number | null = null
 let speed: Speed = 1
 let accumulator = 0
 let lastTs = performance.now()
+
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <header class="top-bar">
@@ -88,7 +98,18 @@ const btnRestart = document.querySelector<HTMLButtonElement>('#btn-restart')!
 const btnNew = document.querySelector<HTMLButtonElement>('#btn-new')!
 const modeSelect = document.querySelector<HTMLSelectElement>('#mode')!
 
+canvas.style.touchAction = 'none'
+
 setSeedInUrl(seed)
+
+let camera: Camera = createCamera({
+  arenaW: data.tuning.arenaWidth,
+  arenaH: data.tuning.arenaHeight,
+  viewportW: 1,
+  viewportH: 1,
+  puckDiameter: PUCK_DIAMETER,
+  maxZoomInPucksAcross: data.tuning.maxZoomInPucksAcross,
+})
 
 function makeMatch(s: number, m: CombatMode): Match {
   return createMatch({
@@ -131,24 +152,165 @@ modeSelect.addEventListener('change', () => {
   restart(seed, modeSelect.value as CombatMode)
 })
 
-canvas.addEventListener('pointerdown', (ev) => {
+/** CSS-pixel coords → canvas-pixel coords. */
+function toCanvas(clientX: number, clientY: number): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect()
-  const sx = ((ev.clientX - rect.left) / rect.width) * canvas.width
-  const sy = ((ev.clientY - rect.top) / rect.height) * canvas.height
-  const view = currentView()
-  const world = screenToWorld(sx, sy, view, data.tuning.arenaHeight)
+  return {
+    x: ((clientX - rect.left) / rect.width) * canvas.width,
+    y: ((clientY - rect.top) / rect.height) * canvas.height,
+  }
+}
+
+function selectAtCanvas(sx: number, sy: number): void {
+  const world = screenToWorld(camera, sx, sy)
   const hit = hitTestPuck(world.x, world.y, snapshotPucks(match), 0.35)
   selectedId = hit ? hit.id : null
-})
+}
 
-function currentView() {
-  return computeView(
-    canvas.width,
-    canvas.height,
-    data.tuning.arenaWidth,
-    data.tuning.arenaHeight,
+function centerFromMinimap(sx: number, sy: number): void {
+  const layout = minimapLayout(camera)
+  if (!layout) return
+  const w = minimapScreenToWorld(camera, layout, sx, sy)
+  centerOn(camera, w.x, w.y)
+}
+
+type PointerState = {
+  id: number
+  startClientX: number
+  startClientY: number
+  lastClientX: number
+  lastClientY: number
+  moved: number
+  onMinimap: boolean
+}
+
+const pointers = new Map<number, PointerState>()
+let pinchStartDist = 0
+let pinchStartScale = 1
+let pinchLastMid: { x: number; y: number } | null = null
+
+function activePointers(): PointerState[] {
+  return [...pointers.values()]
+}
+
+function clientDist(a: PointerState, b: PointerState): number {
+  return Math.hypot(a.lastClientX - b.lastClientX, a.lastClientY - b.lastClientY)
+}
+
+function midpointCanvas(a: PointerState, b: PointerState): { x: number; y: number } {
+  return toCanvas(
+    (a.lastClientX + b.lastClientX) / 2,
+    (a.lastClientY + b.lastClientY) / 2,
   )
 }
+
+canvas.addEventListener('pointerdown', (ev) => {
+  canvas.setPointerCapture(ev.pointerId)
+  const c = toCanvas(ev.clientX, ev.clientY)
+  const layout = minimapLayout(camera)
+  const onMinimap = !!layout && minimapContains(layout, c.x, c.y)
+  pointers.set(ev.pointerId, {
+    id: ev.pointerId,
+    startClientX: ev.clientX,
+    startClientY: ev.clientY,
+    lastClientX: ev.clientX,
+    lastClientY: ev.clientY,
+    moved: 0,
+    onMinimap,
+  })
+
+  if (onMinimap) {
+    centerFromMinimap(c.x, c.y)
+    return
+  }
+
+  const pts = activePointers().filter((x) => !x.onMinimap)
+  if (pts.length === 2) {
+    pinchStartDist = clientDist(pts[0]!, pts[1]!)
+    pinchStartScale = camera.scale
+    pinchLastMid = midpointCanvas(pts[0]!, pts[1]!)
+  }
+})
+
+canvas.addEventListener('pointermove', (ev) => {
+  const p = pointers.get(ev.pointerId)
+  if (!p) return
+
+  const prevClientX = p.lastClientX
+  const prevClientY = p.lastClientY
+  p.lastClientX = ev.clientX
+  p.lastClientY = ev.clientY
+  p.moved = Math.hypot(
+    ev.clientX - p.startClientX,
+    ev.clientY - p.startClientY,
+  )
+
+  if (p.onMinimap) {
+    const c = toCanvas(ev.clientX, ev.clientY)
+    centerFromMinimap(c.x, c.y)
+    return
+  }
+
+  const pts = activePointers().filter((x) => !x.onMinimap)
+  if (pts.length === 2) {
+    const [a, b] = pts
+    const dist = clientDist(a!, b!)
+    const mid = midpointCanvas(a!, b!)
+    if (pinchStartDist > 0) {
+      const targetScale = pinchStartScale * (dist / pinchStartDist)
+      zoomAt(camera, mid.x, mid.y, targetScale / camera.scale)
+    }
+    if (pinchLastMid) {
+      panByScreen(camera, mid.x - pinchLastMid.x, mid.y - pinchLastMid.y)
+    }
+    pinchLastMid = mid
+    return
+  }
+
+  if (pts.length === 1 && p.moved >= TAP_SLOP_PX) {
+    const rect = canvas.getBoundingClientRect()
+    const dSx = (ev.clientX - prevClientX) * (canvas.width / rect.width)
+    const dSy = (ev.clientY - prevClientY) * (canvas.height / rect.height)
+    panByScreen(camera, dSx, dSy)
+  }
+})
+
+function endPointer(ev: PointerEvent): void {
+  const p = pointers.get(ev.pointerId)
+  if (!p) return
+  pointers.delete(ev.pointerId)
+
+  if (!p.onMinimap && p.moved < TAP_SLOP_PX && activePointers().length === 0) {
+    const c = toCanvas(ev.clientX, ev.clientY)
+    selectAtCanvas(c.x, c.y)
+  }
+
+  const pts = activePointers().filter((x) => !x.onMinimap)
+  if (pts.length === 2) {
+    pinchStartDist = clientDist(pts[0]!, pts[1]!)
+    pinchStartScale = camera.scale
+    pinchLastMid = midpointCanvas(pts[0]!, pts[1]!)
+  } else {
+    pinchStartDist = 0
+    pinchLastMid = null
+  }
+}
+
+canvas.addEventListener('pointerup', endPointer)
+canvas.addEventListener('pointercancel', endPointer)
+
+canvas.addEventListener(
+  'wheel',
+  (ev) => {
+    ev.preventDefault()
+    const c = toCanvas(ev.clientX, ev.clientY)
+    const layout = minimapLayout(camera)
+    if (layout && minimapContains(layout, c.x, c.y)) return
+    const factor = Math.exp(-ev.deltaY * 0.0015)
+    zoomAt(camera, c.x, c.y, factor)
+  },
+  { passive: false },
+)
 
 function resize(): void {
   const stage = canvas.parentElement!
@@ -157,6 +319,7 @@ function resize(): void {
   const h = stage.clientHeight
   canvas.width = Math.max(1, Math.floor(w * dpr))
   canvas.height = Math.max(1, Math.floor(h * dpr))
+  setViewport(camera, canvas.width, canvas.height)
 }
 
 window.addEventListener('resize', resize)
@@ -247,7 +410,7 @@ function frame(ts: number): void {
     selectedId = null
   }
 
-  drawFrame(ctx, match, pucks, currentView(), selectedId)
+  drawFrame(ctx, match, pucks, camera, selectedId)
   updateStatus()
   updateInspect()
   requestAnimationFrame(frame)
