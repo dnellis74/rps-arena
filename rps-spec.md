@@ -2,9 +2,10 @@
 
 ## 1. Goal
 
-Build the smallest playable version of a rock paper scissors team fight:
-27v27 pucks, 9 rock, 9 paper, 9 scissors per side, all driven by one hand-written
-behavior. The player is a spectator. No AI models in v0.
+Build a playable rock paper scissors team fight. Per-side puck counts come
+only from `data/roster.json` (not hardcoded in sim or UI). Both sides use the
+same roster. All pucks are driven by one hand-written behavior. The player is
+a spectator. No AI models in v0.
 
 This version is the baseline. Later versions replace or extend the hand-written
 behavior with model-authored behaviors, which must beat this baseline in
@@ -54,7 +55,9 @@ v0 values are symmetric. Asymmetric types are on the roadmap.
 - Every attacker has its own 0.8 s hit cooldown.
 - Adding a type (for example lizard and spock) is a data change only.
 
-`data/roster.json`: count per type per side. Default 9/9/9 (27v27).
+`data/roster.json`: count per type per side. This is the sole source of how
+many pucks spawn on each team. Sim and UI read it via `loadGameData()`;
+changing counts is a data edit only. Current default: 9/9/9 (27 per side).
 
 `data/tuning.json`: threat radius, gang-up radius, cooldown, stalemate timeout, steering weights.
 

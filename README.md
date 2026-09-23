@@ -1,8 +1,9 @@
 # RPS Arena
 
-Spectator rock-paper-scissors team fights. Nine pucks per side (3 rock, 3 paper,
-3 scissors), one hand-written behavior, three combat modes. Built as the v0
-baseline for later model-authored behaviors.
+Spectator rock-paper-scissors team fights. Puck counts per type/side come from
+`data/roster.json` (currently 9 rock / 9 paper / 9 scissors). One hand-written
+behavior, three combat modes. Built as the v0 baseline for later model-authored
+behaviors.
 
 ## Requirements
 

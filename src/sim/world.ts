@@ -1,8 +1,6 @@
 import { createWorld, addEntity, removeEntity, addComponent, query } from 'bitecs'
 import type { CombatMode, TeamId, TypeId, TypesData, TuningData } from './types.ts'
 
-const MAX = 256
-
 export type Components = {
   Position: { x: Float32Array; y: Float32Array }
   Velocity: { x: Float32Array; y: Float32Array }
@@ -30,26 +28,29 @@ export type SimWorld = {
   reason: 'elimination' | 'stalemate' | null
 }
 
+/** Entity storage sized for the match (both sides + spare). */
 export function createSimWorld(
   types: TypesData,
   tuning: TuningData,
   mode: CombatMode,
+  entityCapacity: number,
 ): SimWorld {
+  const cap = Math.max(16, Math.ceil(entityCapacity))
   const typeIds = Object.keys(types)
   const typeIndex = new Map(typeIds.map((id, i) => [id, i]))
 
   const world = createWorld({
     components: {
-      Position: { x: new Float32Array(MAX), y: new Float32Array(MAX) },
-      Velocity: { x: new Float32Array(MAX), y: new Float32Array(MAX) },
-      Radius: new Float32Array(MAX),
-      Speed: new Float32Array(MAX),
-      Hp: new Float32Array(MAX),
-      MaxHp: new Float32Array(MAX),
-      Team: new Int8Array(MAX),
-      TypeIndex: new Int16Array(MAX),
-      HitCooldown: new Float32Array(MAX),
-      Alive: new Uint8Array(MAX),
+      Position: { x: new Float32Array(cap), y: new Float32Array(cap) },
+      Velocity: { x: new Float32Array(cap), y: new Float32Array(cap) },
+      Radius: new Float32Array(cap),
+      Speed: new Float32Array(cap),
+      Hp: new Float32Array(cap),
+      MaxHp: new Float32Array(cap),
+      Team: new Int8Array(cap),
+      TypeIndex: new Int16Array(cap),
+      HitCooldown: new Float32Array(cap),
+      Alive: new Uint8Array(cap),
     },
     typeIds,
     typeIndex,

@@ -1,7 +1,7 @@
 import { resolveContacts } from './combat.ts'
 import { stepMovement } from './movement.ts'
 import { SeededRng } from './rng.ts'
-import { expandRoster, spawnTeam } from './spawn.ts'
+import { expandRoster, rosterSideCount, spawnTeam } from './spawn.ts'
 import type {
   BehaviorFn,
   CombatMode,
@@ -38,7 +38,14 @@ export function createMatch(opts: {
   behavior: BehaviorFn
 }): Match {
   const rng = new SeededRng(opts.seed)
-  const world = createSimWorld(opts.types, opts.tuning, opts.mode) as EcsWorld
+  // Capacity from roster data only: both sides + spare for convert churn.
+  const side = rosterSideCount(opts.roster)
+  const world = createSimWorld(
+    opts.types,
+    opts.tuning,
+    opts.mode,
+    side * 2 + 32,
+  ) as EcsWorld
   const rosterA = expandRoster(opts.roster, rng)
   const rosterB = expandRoster(opts.roster, rng)
   spawnTeam(world, 0, rosterA, opts.tuning, rng)

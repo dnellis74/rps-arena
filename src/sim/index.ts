@@ -20,6 +20,7 @@ export {
 export type { Match, PuckSnapshot } from './match.ts'
 export { loadGameData } from './data.ts'
 export { buildObservation } from './perception.ts'
+export { expandRoster, rosterSideCount } from './spawn.ts'
 export type {
   BehaviorFn,
   CombatMode,
