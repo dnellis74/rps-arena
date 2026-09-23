@@ -37,6 +37,11 @@ export type TuningData = {
    * running from a more distant predator.
    */
   attackOverFlee: number
+  /**
+   * Preferred keep-clear range for same-tier without HP advantage.
+   * ~2 circle widths (diameters); with radius 0.5 that is 2.0 units.
+   */
+  standoffDistance: number
 }
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'

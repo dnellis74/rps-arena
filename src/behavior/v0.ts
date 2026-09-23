@@ -27,7 +27,8 @@ export type BehaviorContext = {
  */
 export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
   const { types, damage, tuning } = ctx
-  const { threatRadius, gangUpRadius, attackOverFlee } = tuning
+  const { threatRadius, gangUpRadius, attackOverFlee, standoffDistance } =
+    tuning
 
   return (obs: Observation) => {
     const nearestPredator = nearestWithin(obs.predators, threatRadius)
@@ -75,8 +76,8 @@ export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
     const same = obs.sameTier[0]
     if (same) {
       if (obs.hp > same.band.high) return dirToward(same)
-      // Keep clear: same-tier without HP advantage only (not prey).
-      if (same.dist < threatRadius) {
+      // Keep clear only inside standoff (~2 circle widths), not full threat radius.
+      if (same.dist < standoffDistance) {
         return { x: -same.dx, y: -same.dy }
       }
     }
