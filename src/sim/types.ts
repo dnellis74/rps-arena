@@ -31,6 +31,12 @@ export type TuningData = {
   }
   spawnJitter: number
   fixedDt: number
+  /**
+   * When a predator is in threat range, still Seek if nearest prey distance is
+   * at most predatorDist * attackOverFlee. Slightly favors finishing kills over
+   * running from a more distant predator.
+   */
+  attackOverFlee: number
 }
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'

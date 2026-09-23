@@ -13,5 +13,6 @@
     "walls": 2.0
   },
   "spawnJitter": 0.35,
-  "fixedDt": 0.016666666666666666
+  "fixedDt": 0.016666666666666666,
+  "attackOverFlee": 1.25
 }

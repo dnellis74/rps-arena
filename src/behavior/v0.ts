@@ -10,18 +10,28 @@ export type BehaviorContext = {
 
 /**
  * v0 hand-written behavior.
- * Priority: gang-up → flee → seek → same-tier (HP advantage) → idle near teammates.
+ * Priority: gang-up → (ahead + near-even: press) → flee (unless nearby prey
+ * worth finishing) → seek → same-tier (HP advantage) → idle near teammates.
  *
  * Note on "keep clear": that steering only applies to same-tier enemies without an
  * HP advantage (spec §4 same-tier fight). Prey is always Seek/engage — close to
  * contact. Rock vs scissors is prey for rock, never keep-clear.
+ *
+ * Attack vs run: if prey is about as close as (or closer than) the nearest
+ * predator — within attackOverFlee × predator distance — Seek instead of Flee
+ * so easy kills aren't abandoned to distant chasers.
+ *
+ * Lead press: when this team is ahead on estimated HP, do not flee a near-even
+ * local fight (gang allies within one of the kill-before-killed threshold) —
+ * press the encounter instead.
  */
 export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
   const { types, damage, tuning } = ctx
-  const { threatRadius, gangUpRadius } = tuning
+  const { threatRadius, gangUpRadius, attackOverFlee } = tuning
 
   return (obs: Observation) => {
     const nearestPredator = nearestWithin(obs.predators, threatRadius)
+    const prey = obs.prey[0]
 
     if (nearestPredator) {
       const threshold = gangUpThreshold(
@@ -39,6 +49,18 @@ export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
       if (allies >= threshold) {
         return dirToward(nearestPredator)
       }
+      // Ahead + near-even local odds → press instead of flee.
+      // threshold-1 is the simultaneous even race (v0: 2 vs predator).
+      if (teamAhead(obs) && allies >= threshold - 1 && allies >= 1) {
+        return dirToward(nearestPredator)
+      }
+      // Prefer finishing nearby prey over fleeing a farther predator.
+      if (
+        prey &&
+        prey.dist <= nearestPredator.dist * attackOverFlee
+      ) {
+        return dirToward(prey)
+      }
       // Flee: weight rises sharply as predator gets closer.
       const closeness = 1 - nearestPredator.dist / threatRadius
       const weight = 1 + closeness * closeness * 4
@@ -48,7 +70,6 @@ export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
       }
     }
 
-    const prey = obs.prey[0]
     if (prey) return dirToward(prey)
 
     const same = obs.sameTier[0]
@@ -74,6 +95,19 @@ export function createV0Behavior(ctx: BehaviorContext): BehaviorFn {
 
     return { x: 0, y: 0 }
   }
+}
+
+/** Rough team HP from exact self HP + seen band midpoints. */
+function teamAhead(obs: Observation): boolean {
+  let us = obs.hp
+  for (const t of obs.teammates) {
+    us += (t.band.low + t.band.high) / 2
+  }
+  let them = 0
+  for (const e of obs.prey) them += (e.band.low + e.band.high) / 2
+  for (const e of obs.predators) them += (e.band.low + e.band.high) / 2
+  for (const e of obs.sameTier) them += (e.band.low + e.band.high) / 2
+  return us > them
 }
 
 function nearestWithin(

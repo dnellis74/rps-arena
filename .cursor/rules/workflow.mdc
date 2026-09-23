@@ -1,0 +1,10 @@
+---
+description: RPS Arena agent workflow (Vite, git, tests)
+alwaysApply: true
+---
+
+# Agent workflow
+
+- **Stop Vite before editing.** Kill the dev server (port 4721) before making code changes so HMR/reload does not slow the machine. Start it again when the human needs to playtest.
+- **Do not commit or push** unless Dave explicitly asks.
+- **Headless tests only.** Do not automate UI/browser testing; the human playtests the game.
