@@ -15,5 +15,5 @@
   "spawnJitter": 0.35,
   "fixedDt": 0.016666666666666666,
   "attackOverFlee": 1.25,
-  "standoffDistance": 5.0
+  "standoffDistance": 4.0
 }
