@@ -152,6 +152,16 @@ modeSelect.addEventListener('change', () => {
   restart(seed, modeSelect.value as CombatMode)
 })
 
+window.addEventListener('keydown', (ev) => {
+  if (ev.code !== 'Space' && ev.key !== ' ') return
+  const t = ev.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+    return
+  }
+  ev.preventDefault()
+  setSpeed(speed === 0 ? 1 : 0)
+})
+
 /** CSS-pixel coords → canvas-pixel coords. */
 function toCanvas(clientX: number, clientY: number): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect()

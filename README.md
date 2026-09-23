@@ -1,9 +1,10 @@
 # RPS Arena
 
-Spectator rock-paper-scissors team fights. Puck counts per type/side come from
-`data/roster.json` (currently 9 rock / 9 paper / 9 scissors). One hand-written
-behavior, three combat modes. Built as the v0 baseline for later model-authored
-behaviors.
+Spectator rock-paper-scissors team fights. Each side's puck counts come from
+`data/roster.json` (currently 25 rock / 25 paper / 25 scissors per side; the
+sides can differ). Type stats and the damage they deal live together in
+`data/types.json`. One hand-written behavior, three combat modes. Built as the
+v0 baseline for later model-authored behaviors.
 
 ## Requirements
 
@@ -16,10 +17,11 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:4721](http://127.0.0.1:4721). Optional seed query:
+Open [http://127.0.0.1:4721](http://127.0.0.1:4721) only — RPS is locked to port
+**4721** (`strictPort`; never falls back to 5173). Optional seed query:
 `?seed=12345`.
 
-Controls: pause, 1x / 4x, restart same seed, new seed, combat mode selector.
+Controls: pause (button or Space), 1x / 4x, restart same seed, new seed, combat mode selector.
 Tap a puck to inspect type, team, HP, and lines to its current prey / predator.
 
 ## Run tests
@@ -36,7 +38,7 @@ UI is not automated.
 
 | Path | Role |
 |---|---|
-| `data/` | Types, damage matrix, roster, tuning (data-driven) |
+| `data/` | Types (stats and damage), roster, tuning (data-driven) |
 | `src/sim/` | Headless simulation (no render/UI imports) |
 | `src/behavior/` | Hand-written v0 behavior (`behavior(observation) -> direction`) |
 | `src/render/` | Canvas 2D drawing |

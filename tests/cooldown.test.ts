@@ -22,7 +22,10 @@ describe('hit cooldown', () => {
       mode: 'damage',
       seed: 7,
       behavior,
-      roster: { rock: 1, paper: 1, scissors: 0 },
+      roster: {
+        a: { rock: 1, paper: 1, scissors: 0 },
+        b: { rock: 1, paper: 1, scissors: 0 },
+      },
     })
 
     // Keep one rock (team A) and one paper (team B); remove the rest.

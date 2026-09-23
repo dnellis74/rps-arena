@@ -1,5 +1,4 @@
 {
-  "rock": 25,
-  "paper": 25,
-  "scissors": 25
+  "a": { "rock": 25, "paper": 25, "scissors": 25 },
+  "b": { "rock": 25, "paper": 25, "scissors": 25 }
 }

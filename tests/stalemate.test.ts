@@ -23,7 +23,10 @@ describe('stalemate timer', () => {
       mode: 'damage',
       seed: 99,
       behavior,
-      roster: { rock: 2, paper: 0, scissors: 0 },
+      roster: {
+        a: { rock: 2, paper: 0, scissors: 0 },
+        b: { rock: 2, paper: 0, scissors: 0 },
+      },
     })
 
     for (const p of snapshotPucks(match)) {

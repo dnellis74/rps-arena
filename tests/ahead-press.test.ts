@@ -16,8 +16,8 @@ function baseObs(partial: Partial<Observation>): Observation {
     team: 0,
     x: 8,
     y: 12,
-    hp: 6,
-    maxHp: 6,
+    hp: 12,
+    maxHp: 12,
     prey: [],
     predators: [],
     sameTier: [],
@@ -26,21 +26,30 @@ function baseObs(partial: Partial<Observation>): Observation {
   }
 }
 
-const fullBand = { low: 4, high: 6, index: 2 }
+const fullBand = { low: 8, high: 12, index: 2 }
 
 describe('ahead press on near-even encounters', () => {
-  it('engages predator when ahead and 2 allies make even odds (threshold-1)', () => {
-    // Team ahead on HP; 2 rocks within gang radius of paper (even race, not yet 3).
+  it('engages predator when ahead and allies >= threshold-1', () => {
+    // threshold is 4; near-even press at 3 (self + 2 rocks in gang radius).
     const obs = baseObs({
-      hp: 6,
+      hp: 12,
       teammates: [
         {
           id: 10,
           type: 'rock',
           team: 0,
-          dx: 0.5,
+          dx: 0.4,
           dy: 0,
-          dist: 0.5,
+          dist: 0.4,
+          band: fullBand,
+        },
+        {
+          id: 12,
+          type: 'rock',
+          team: 0,
+          dx: 0,
+          dy: 0.4,
+          dist: 0.4,
           band: fullBand,
         },
         {
@@ -64,12 +73,10 @@ describe('ahead press on near-even encounters', () => {
           band: fullBand,
         },
       ],
-      // Thin enemy side so we are ahead.
       prey: [],
       sameTier: [],
     })
     const dir = behavior(obs)
-    // Engage paper (+y), not flee (−y).
     expect(dir.y).toBeGreaterThan(0)
   })
 
@@ -118,7 +125,6 @@ describe('ahead press on near-even encounters', () => {
         },
       ],
     })
-    // Behind on HP, only 1 in gang → flee (−y).
     const dir = behavior(obs)
     expect(dir.y).toBeLessThan(0)
   })

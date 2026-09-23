@@ -3,9 +3,9 @@
 ## 1. Goal
 
 Build a playable rock paper scissors team fight. Per-side puck counts come
-only from `data/roster.json` (not hardcoded in sim or UI). Both sides use the
-same roster. All pucks are driven by one hand-written behavior. The player is
-a spectator. No AI models in v0.
+only from `data/roster.json` (not hardcoded in sim or UI). Each side has its
+own counts, so a fight can be asymmetric. All pucks are driven by one
+hand-written behavior. The player is a spectator. No AI models in v0.
 
 This version is the baseline. Later versions replace or extend the hand-written
 behavior with model-authored behaviors, which must beat this baseline in
@@ -29,35 +29,31 @@ v0 includes camera zoom and pan (spectator view only).
 All type stats, matchups, and the roster come from data files, not code.
 v0 values are symmetric. Asymmetric types are on the roadmap.
 
-`data/types.json`
+`data/types.json`: one object per type. Stats and the damage that type deals
+live in the same object. `loadGameData()` splits them into type stats and the
+damage matrix.
 
-| Type | Glyph | HP | Speed | Radius | HP band size | Convert HP |
-|---|---|---|---|---|---|---|
-| rock | R | 6 | 4.0 | 0.5 | 1/3 | 1/2 |
-| paper | P | 6 | 4.0 | 0.5 | 1/3 | 1/2 |
-| scissors | S | 6 | 4.0 | 0.5 | 1/3 | 1/2 |
+| Type | Glyph | HP | Speed | Radius | HP band size | Convert HP | vs rock | vs paper | vs scissors |
+|---|---|---|---|---|---|---|---|---|---|
+| rock | R | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 2 | 1 | 3 |
+| paper | P | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 3 | 2 | 1 |
+| scissors | S | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 1 | 3 | 2 |
 
 - HP band size: how precisely this type reads an enemy's HP, as a fraction of
   the enemy's max HP. 1/3 gives three bands (high, mid, low).
 - Convert HP: in convert mode, the fraction of max HP a puck has after being
   converted into this type.
-
-`data/damage.json`: damage[attacker][defender] per hit
-
-|  | vs rock | vs paper | vs scissors |
-|---|---|---|---|
-| rock | 1 | 1 | 2 |
-| paper | 2 | 1 | 1 |
-| scissors | 1 | 2 | 1 |
-
-- Relationships are derived from the matrix. A preys on B when
-  damage[A][B] > damage[B][A]. Equal values mean same-tier.
+- Damage: per hit against each defender. Relative to matchup: 3 vs prey,
+  2 vs same-tier (peer), 1 vs predator.
+- Relationships are derived from those values. A preys on B when A's damage
+  vs B is greater than B's damage vs A. Equal values mean same-tier.
 - Every attacker has its own 0.8 s hit cooldown.
 - Adding a type (for example lizard and spock) is a data change only.
 
-`data/roster.json`: count per type per side. This is the sole source of how
-many pucks spawn on each team. Sim and UI read it via `loadGameData()`;
-changing counts is a data edit only. Current default: 9/9/9 (27 per side).
+`data/roster.json`: counts per type for side `a` and side `b`. The sides may
+differ. This is the sole source of how many pucks spawn on each team. Sim and
+UI read it via `loadGameData()`; changing counts is a data edit only. Current
+default: 25 rock / 25 paper / 25 scissors on each side.
 
 `data/tuning.json`: threat radius, gang-up radius, cooldown, stalemate timeout, steering weights.
 
@@ -79,6 +75,10 @@ Team colors: Team A blue fill, Team B orange fill, white glyph.
 - Prey: an enemy this puck preys on.
 - Predator: an enemy that preys on this puck.
 - Same-tier enemy: neither preys on the other (same type in v0).
+- Counter ally: the nearest teammate that preys on this puck's current
+  predator's type (derived from the damage matrix). Example: scissors whose
+  nearest predator is rock links to the nearest allied paper (paper preys on
+  rock). No shared memory — each puck picks the link from its own observation.
 
 ### Intent, in priority order
 
@@ -87,8 +87,10 @@ Team colors: Team A blue fill, Team B orange fill, white glyph.
    included, are within the gang-up radius (start 3 units) of it, engage it.
    The required count is the gang-up threshold (see below).
 2. **Flee.** Otherwise, move away from the nearest predator within the threat
-   radius. Weight rises sharply as it gets closer.
-3. **Seek.** Move toward the nearest prey.
+   radius. Weight rises sharply as it gets closer. Flee intent is biased toward
+   the counter ally when one exists (`counterAllyBias` in `data/tuning.json`).
+3. **Seek.** Move toward the nearest prey. If a predator is still in threat
+   range but Seek won via attack-over-flee, apply a lighter counter-ally bias.
 4. **Same-tier fight.** Engage a same-tier enemy only with an HP advantage:
    own HP is above the top of the enemy's seen band. Otherwise keep clear.
 5. **Idle.** Nothing to do: hold near teammates.
@@ -97,7 +99,8 @@ Team colors: Team A blue fill, Team B orange fill, white glyph.
 
 Derived from the data, not fixed: the smallest group whose combined damage
 kills the predator before the predator kills one member of the group,
-assuming simultaneous arrival and equal cooldowns. With v0 numbers this is 3.
+assuming simultaneous arrival and equal cooldowns. With current v0 numbers
+(HP 12, 1 damage into predator / 3 from predator) this is 4.
 Staggered arrival is not modeled in v0. The batch tests will show whether
 this estimate is good enough.
 
@@ -147,8 +150,9 @@ Combat mode is a match setting:
 ## 7. UI
 
 - Spectator only in v0.
-- Tap a puck: show type, team, HP, and lines to its current prey and predator.
-- Controls: pause, 1x, 4x, restart with same seed, restart with new seed,
+- Tap a puck: show type, team, HP, and lines to its current prey (green),
+  predator (red), and counter ally (cyan) when those exist.
+- Controls: pause (button or Space), 1x, 4x, restart with same seed, restart with new seed,
   combat mode selector.
 - Status line: seed, elapsed time, pucks remaining per side.
 - End screen: winner, time, survivors, reason (elimination or stalemate).

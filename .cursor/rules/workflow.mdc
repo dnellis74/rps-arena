@@ -1,10 +1,13 @@
 ---
-description: RPS Arena agent workflow (Vite, git, tests)
+description: RPS Arena agent workflow (Vite, git, tests, ports)
 alwaysApply: true
 ---
 
 # Agent workflow
 
-- **Stop Vite before editing.** Kill the dev server (port 4721) before making code changes so HMR/reload does not slow the machine. Start it again when the human needs to playtest.
+- **Stop RPS Vite before editing.** Kill the RPS dev server (port **4721**) before making code changes so HMR/reload does not slow the machine. Start it again when the human needs to playtest.
+- **RPS listens on 4721 only.** Never use or fall back to 5173. Keep `vite.config` `strictPort: true` and `package.json` `dev` pinned to `--port 4721 --strictPort`.
+- **Do not start other projects’ servers.** This agent works on RPS Arena only. Do not run `npm run dev` (or similar) in sibling repos such as arena-raid.
+- **Free 5173 if something else grabbed it.** If port 5173 is occupied (often another project’s Vite), kill that process so it does not confuse Dave. Do not leave foreign Vite/dev servers running.
 - **Do not commit or push** unless Dave explicitly asks.
 - **Headless tests only.** Do not automate UI/browser testing; the human playtests the game.

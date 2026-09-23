@@ -1,5 +1,0 @@
-{
-  "rock": { "rock": 1, "paper": 1, "scissors": 2 },
-  "paper": { "rock": 2, "paper": 1, "scissors": 1 },
-  "scissors": { "rock": 1, "paper": 2, "scissors": 1 }
-}

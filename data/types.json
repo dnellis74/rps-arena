@@ -1,26 +1,29 @@
 {
   "rock": {
     "glyph": "R",
-    "hp": 6,
+    "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
     "hpBandSize": 0.3333333333333333,
-    "convertHp": 0.5
+    "convertHp": 0.5,
+    "damage": { "rock": 2, "paper": 1, "scissors": 3 }
   },
   "paper": {
     "glyph": "P",
-    "hp": 6,
+    "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
     "hpBandSize": 0.3333333333333333,
-    "convertHp": 0.5
+    "convertHp": 0.5,
+    "damage": { "rock": 3, "paper": 2, "scissors": 1 }
   },
   "scissors": {
     "glyph": "S",
-    "hp": 6,
+    "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
     "hpBandSize": 0.3333333333333333,
-    "convertHp": 0.5
+    "convertHp": 0.5,
+    "damage": { "rock": 1, "paper": 3, "scissors": 2 }
   }
 }

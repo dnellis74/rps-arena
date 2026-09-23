@@ -1,5 +1,6 @@
 import type { Match, PuckSnapshot } from '../sim/match.ts'
 import { buildObservation } from '../sim/perception.ts'
+import { counterAllyLink } from '../sim/targeting.ts'
 import type { CombatMode, TeamId } from '../sim/types.ts'
 import {
   minimapLayout,
@@ -25,16 +26,13 @@ export function drawFrame(
 
   ctx.clearRect(0, 0, cam.viewportW, cam.viewportH)
 
-  // Letterbox / off-arena background
   ctx.fillStyle = '#1a1c22'
   ctx.fillRect(0, 0, cam.viewportW, cam.viewportH)
 
-  // Arena floor
   const origin = worldToScreen(cam, 0, H)
   ctx.fillStyle = '#2a2e38'
   ctx.fillRect(origin.x, origin.y, W * cam.scale, H * cam.scale)
 
-  // Subtle thirds
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'
   ctx.lineWidth = 1
   for (let t = 1; t <= 2; t++) {
@@ -47,7 +45,7 @@ export function drawFrame(
     ctx.stroke()
   }
 
-  // Selection lines to prey / predator
+  // Selection lines: prey (green), predator (red), counter-ally (cyan)
   if (selectedId !== null) {
     const sel = pucks.find((p) => p.id === selectedId)
     if (sel) {
@@ -68,6 +66,15 @@ export function drawFrame(
           sel.y + obs.predators[0].dy,
         )
         strokeLine(ctx, from, t, 'rgba(240, 70, 70, 0.85)', 2)
+      }
+      const link = counterAllyLink(obs, match.damage)
+      if (link) {
+        const t = worldToScreen(
+          cam,
+          sel.x + link.ally.dx,
+          sel.y + link.ally.dy,
+        )
+        strokeLine(ctx, from, t, 'rgba(80, 210, 230, 0.9)', 2)
       }
     }
   }

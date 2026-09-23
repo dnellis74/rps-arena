@@ -13,7 +13,13 @@ export type TypeDef = {
 
 export type TypesData = Record<TypeId, TypeDef>
 export type DamageMatrix = Record<TypeId, Record<TypeId, number>>
-export type RosterData = Record<TypeId, number>
+/** Counts of each type on one team. */
+export type SideRoster = Record<TypeId, number>
+/** Per-side type counts. The two sides may differ. */
+export type RosterData = {
+  a: SideRoster
+  b: SideRoster
+}
 
 export type TuningData = {
   arenaWidth: number
@@ -44,6 +50,11 @@ export type TuningData = {
   standoffDistance: number
   /** Short-side puck diameters at max zoom-in (camera; render-only). */
   maxZoomInPucksAcross: number
+  /**
+   * When fleeing, blend this much of the unit direction toward the counter
+   * ally (nearest teammate that preys on the pursuer's type) into flee intent.
+   */
+  counterAllyBias: number
 }
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'

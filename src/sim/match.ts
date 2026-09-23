@@ -39,15 +39,16 @@ export function createMatch(opts: {
 }): Match {
   const rng = new SeededRng(opts.seed)
   // Capacity from roster data only: both sides + spare for convert churn.
-  const side = rosterSideCount(opts.roster)
+  const countA = rosterSideCount(opts.roster.a)
+  const countB = rosterSideCount(opts.roster.b)
   const world = createSimWorld(
     opts.types,
     opts.tuning,
     opts.mode,
-    side * 2 + 32,
+    countA + countB + 32,
   ) as EcsWorld
-  const rosterA = expandRoster(opts.roster, rng)
-  const rosterB = expandRoster(opts.roster, rng)
+  const rosterA = expandRoster(opts.roster.a, rng)
+  const rosterB = expandRoster(opts.roster.b, rng)
   spawnTeam(world, 0, rosterA, opts.tuning, rng)
   spawnTeam(world, 1, rosterB, opts.tuning, rng)
   return {

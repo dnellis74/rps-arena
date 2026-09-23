@@ -1,16 +1,16 @@
 import type { SeededRng } from './rng.ts'
-import type { RosterData, TeamId, TypeId, TuningData } from './types.ts'
+import type { SideRoster, TeamId, TypeId, TuningData } from './types.ts'
 import { spawnPuck, type EcsWorld } from './world.ts'
 
-/** Total pucks spawned on one side from roster counts. */
-export function rosterSideCount(roster: RosterData): number {
+/** Total pucks spawned on one side from that side's roster counts. */
+export function rosterSideCount(roster: SideRoster): number {
   let n = 0
   for (const count of Object.values(roster)) n += count
   return n
 }
 
-/** Expand roster counts into a flat list of type ids, then shuffle. */
-export function expandRoster(roster: RosterData, rng: SeededRng): TypeId[] {
+/** Expand one side's roster counts into a flat list of type ids, then shuffle. */
+export function expandRoster(roster: SideRoster, rng: SeededRng): TypeId[] {
   const list: TypeId[] = []
   for (const [type, count] of Object.entries(roster)) {
     for (let i = 0; i < count; i++) list.push(type)

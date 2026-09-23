@@ -15,12 +15,29 @@ const behavior = createV0Behavior({
   tuning: data.tuning,
 })
 
+function talliesFor(
+  match: ReturnType<typeof createMatch>,
+  team: 0 | 1,
+): Record<string, number> {
+  const tallies: Record<string, number> = {}
+  for (const p of snapshotPucks(match)) {
+    if (p.team !== team) continue
+    tallies[p.type] = (tallies[p.type] ?? 0) + 1
+  }
+  return tallies
+}
+
 describe('data-driven roster', () => {
-  it('loads side size only from data/roster.json defaults', () => {
-    expect(rosterSideCount(data.roster)).toBe(
-      (data.roster.rock ?? 0) +
-        (data.roster.paper ?? 0) +
-        (data.roster.scissors ?? 0),
+  it('loads each side only from data/roster.json', () => {
+    expect(rosterSideCount(data.roster.a)).toBe(
+      (data.roster.a.rock ?? 0) +
+        (data.roster.a.paper ?? 0) +
+        (data.roster.a.scissors ?? 0),
+    )
+    expect(rosterSideCount(data.roster.b)).toBe(
+      (data.roster.b.rock ?? 0) +
+        (data.roster.b.paper ?? 0) +
+        (data.roster.b.scissors ?? 0),
     )
     const match = createMatch({
       ...data,
@@ -29,13 +46,15 @@ describe('data-driven roster', () => {
       behavior,
     })
     const counts = countTeams(match.world)
-    const side = rosterSideCount(data.roster)
-    expect(counts.a).toBe(side)
-    expect(counts.b).toBe(side)
+    expect(counts.a).toBe(rosterSideCount(data.roster.a))
+    expect(counts.b).toBe(rosterSideCount(data.roster.b))
   })
 
-  it('spawns exact per-type counts from the roster argument (not hardcoded)', () => {
-    const roster = { rock: 2, paper: 4, scissors: 1 }
+  it('spawns exact per-type counts from each side of the roster', () => {
+    const roster = {
+      a: { rock: 2, paper: 4, scissors: 1 },
+      b: { rock: 2, paper: 4, scissors: 1 },
+    }
     const match = createMatch({
       ...data,
       roster,
@@ -43,16 +62,28 @@ describe('data-driven roster', () => {
       seed: 2,
       behavior,
     })
-    const side = rosterSideCount(roster)
-    expect(countTeams(match.world)).toEqual({ a: side, b: side })
+    expect(countTeams(match.world)).toEqual({
+      a: rosterSideCount(roster.a),
+      b: rosterSideCount(roster.b),
+    })
+    expect(talliesFor(match, 0)).toEqual(roster.a)
+    expect(talliesFor(match, 1)).toEqual(roster.b)
+  })
 
-    for (const team of [0, 1] as const) {
-      const tallies: Record<string, number> = {}
-      for (const p of snapshotPucks(match)) {
-        if (p.team !== team) continue
-        tallies[p.type] = (tallies[p.type] ?? 0) + 1
-      }
-      expect(tallies).toEqual({ rock: 2, paper: 4, scissors: 1 })
+  it('allows the two sides to differ', () => {
+    const roster = {
+      a: { rock: 5, paper: 0, scissors: 1 },
+      b: { rock: 0, paper: 3, scissors: 2 },
     }
+    const match = createMatch({
+      ...data,
+      roster,
+      mode: 'damage',
+      seed: 3,
+      behavior,
+    })
+    expect(countTeams(match.world)).toEqual({ a: 6, b: 5 })
+    expect(talliesFor(match, 0)).toEqual({ rock: 5, scissors: 1 })
+    expect(talliesFor(match, 1)).toEqual({ paper: 3, scissors: 2 })
   })
 })
