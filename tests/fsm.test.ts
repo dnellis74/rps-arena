@@ -9,17 +9,12 @@ import { killPuck, spawnPuck } from '../src/sim/world.ts'
 
 const data = loadGameData()
 
-const emptyRoster = {
-  a: { rock: 0, paper: 0, scissors: 0 },
-  b: { rock: 0, paper: 0, scissors: 0 },
-}
-
 function emptyMatch(seed = 1) {
   return createMatch({
     ...data,
-    roster: emptyRoster,
     mode: 'damage',
     seed,
+    opponent: () => null,
   })
 }
 
@@ -253,13 +248,13 @@ describe('state machine transitions', () => {
     ).toBeGreaterThan(0)
   })
 
-  it('regrouping: timeout → Hunting', () => {
+  it('regrouping: timeout → Advancing', () => {
     const match = emptyMatch()
     const self = spawnPuck(match.world, { x: 10, y: 10, team: 0, type: 'rock' })
     match.world.components.State[self] = PuckStates.Regrouping
     match.world.components.TimeInState[self] = match.world.tuning.regroupMaxTime
     stepMatch(match)
-    expect(stateOf(match, self)).toBe(PuckStates.Hunting)
+    expect(stateOf(match, self)).toBe(PuckStates.Advancing)
     expect(
       match.world.stateMetrics.transitions['regrouping:timeout'],
     ).toBeGreaterThan(0)

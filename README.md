@@ -1,10 +1,8 @@
 # RPS Arena
 
-Spectator rock-paper-scissors team fights. Each side's puck counts come from
-`data/roster.json` (currently 25 rock / 25 paper / 25 scissors per side; the
-sides can differ). Type stats and the damage they deal live together in
-`data/types.json`. One hand-written behavior, three combat modes. Built as the
-v0 baseline for later model-authored behaviors.
+Rock-paper-scissors team fights. The field starts empty. Each side
+earns charges and spends them to spawn units (Team A by the player, Team B by
+a random opponent). Type stats and damage live in `data/types.json`.
 
 ## Requirements
 
@@ -38,7 +36,7 @@ UI is not automated.
 
 | Path | Role |
 |---|---|
-| `data/` | Types (stats and damage), roster, tuning (data-driven) |
+| `data/` | Types (stats and damage) and tuning |
 | `src/sim/` | Headless simulation (no render/UI imports) |
 | `src/behavior/` | Hand-written v0 behavior (`behavior(observation) -> direction`) |
 | `src/render/` | Canvas 2D drawing |

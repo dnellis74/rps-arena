@@ -18,10 +18,7 @@ describe('cornered prey engagement', () => {
       ...data,
       mode: 'damage',
       seed: 1,
-      roster: {
-        a: { rock: 0, paper: 0, scissors: 0 },
-        b: { rock: 0, paper: 0, scissors: 0 },
-      },
+      opponent: () => null,
     })
 
     const scissorsId = spawnPuck(match.world, {

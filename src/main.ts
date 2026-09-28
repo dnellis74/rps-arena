@@ -5,12 +5,14 @@ import {
   createMatch,
   getMatchResult,
   loadGameData,
+  queueSpawn,
   randomSeed,
   snapshotPucks,
   stepMatch,
   type CombatMode,
   type Match,
 } from './sim/index.ts'
+import type { TypeId } from './sim/types.ts'
 import {
   centerOn,
   createCamera,
@@ -83,6 +85,16 @@ app.innerHTML = `
       <span><i class="leg-eng"></i>Engage</span>
       <span><i class="leg-ret"></i>Retreat</span>
       <span><i class="leg-reg"></i>Regroup</span>
+      <span><i class="leg-adv"></i>Advance</span>
+    </div>
+    <div class="spawn-bar">
+      <div class="charges" id="charges">Charges 0</div>
+      <div class="charge-track" aria-hidden="true"><div id="charge-fill"></div></div>
+      <div class="spawn-buttons">
+        <button type="button" id="spawn-rock" class="spawn" disabled>R</button>
+        <button type="button" id="spawn-paper" class="spawn" disabled>P</button>
+        <button type="button" id="spawn-scissors" class="spawn" disabled>S</button>
+      </div>
     </div>
   </div>
 `
@@ -98,6 +110,13 @@ const btn4x = document.querySelector<HTMLButtonElement>('#btn-4x')!
 const btnRestart = document.querySelector<HTMLButtonElement>('#btn-restart')!
 const btnNew = document.querySelector<HTMLButtonElement>('#btn-new')!
 const modeSelect = document.querySelector<HTMLSelectElement>('#mode')!
+const chargesEl = document.querySelector<HTMLDivElement>('#charges')!
+const chargeFill = document.querySelector<HTMLDivElement>('#charge-fill')!
+const spawnButtons = {
+  rock: document.querySelector<HTMLButtonElement>('#spawn-rock')!,
+  paper: document.querySelector<HTMLButtonElement>('#spawn-paper')!,
+  scissors: document.querySelector<HTMLButtonElement>('#spawn-scissors')!,
+}
 
 canvas.style.touchAction = 'none'
 
@@ -116,7 +135,6 @@ function makeMatch(s: number, m: CombatMode): Match {
   return createMatch({
     types: data.types,
     damage: data.damage,
-    roster: data.roster,
     tuning: data.tuning,
     mode: m,
     seed: s,
@@ -151,6 +169,14 @@ btnNew.addEventListener('click', () => restart(randomSeed()))
 modeSelect.addEventListener('change', () => {
   restart(seed, modeSelect.value as CombatMode)
 })
+
+for (const type of ['rock', 'paper', 'scissors'] as const) {
+  spawnButtons[type].addEventListener('click', () => {
+    if (match.world.finished) return
+    queueSpawn(match, type as TypeId)
+    updateSpawnControls()
+  })
+}
 
 window.addEventListener('keydown', (ev) => {
   if (ev.code !== 'Space' && ev.key !== ' ') return
@@ -345,21 +371,34 @@ function formatTime(t: number): string {
 function updateStatus(): void {
   const counts = countTeams(match.world)
   const states = countStatesByTeam(match.world)
-  const noHit = match.world.timeSinceHit
-  const timeout = data.tuning.stalemateTimeout
   const fmt = (s: typeof states.a) =>
-    `H${s.Hunting} E${s.Engaged} R${s.Retreating} G${s.Regrouping}`
+    `H${s.Hunting} E${s.Engaged} R${s.Retreating} G${s.Regrouping} A${s.Advancing}`
   statusEl.innerHTML = `
     seed <strong>${seed}</strong>
     · ${formatTime(match.world.elapsed)}
+    · charges <strong>${match.world.charges[0]}</strong>
     · <span class="team-a">A ${counts.a}</span>
     / <span class="team-b">B ${counts.b}</span>
-    · no-hit ${noHit.toFixed(1)}/${timeout}s
     · ${modeLabel(mode)}
     <br />
     <span class="team-a">A ${fmt(states.a)}</span>
     · <span class="team-b">B ${fmt(states.b)}</span>
   `
+}
+
+function updateSpawnControls(): void {
+  const tick = match.world.tick
+  let pending = 0
+  for (const input of match.inputs) {
+    if (!input.applied && input.tick === tick) pending++
+  }
+  const available = match.world.charges[0] - pending
+  const interval = data.tuning.chargeInterval
+  const frac = Math.max(0, Math.min(1, match.world.chargeProgress[0] / interval))
+  chargesEl.textContent = `Charges ${Math.max(0, available)}`
+  chargeFill.style.width = `${frac * 100}%`
+  const off = available < 1 || match.world.finished
+  for (const btn of Object.values(spawnButtons)) btn.disabled = off
 }
 
 function updateInspect(): void {
@@ -402,11 +441,10 @@ function showEnd(result: NonNullable<ReturnType<typeof getMatchResult>>): void {
   endEl.innerHTML = `
     <div class="end-card">
       <h2>${winnerText}</h2>
-      <p>${result.reason === 'elimination' ? 'Elimination' : 'Stalemate'}</p>
+      <p>${formatTime(result.elapsed)}</p>
       <div class="detail">
-        ${formatTime(result.elapsed)}
-        · A ${result.survivorsA} (HP ${result.totalHpA.toFixed(0)})
-        · B ${result.survivorsB} (HP ${result.totalHpB.toFixed(0)})
+        Spawned A ${result.spawnedA} · B ${result.spawnedB}<br />
+        Lost A ${result.lostA} · B ${result.lostB}
       </div>
     </div>
   `
@@ -439,6 +477,7 @@ function frame(ts: number): void {
 
   drawFrame(ctx, match, pucks, camera, selectedId)
   updateStatus()
+  updateSpawnControls()
   updateInspect()
   requestAnimationFrame(frame)
 }

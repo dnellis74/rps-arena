@@ -3,9 +3,8 @@ import {
   createMatch,
   loadGameData,
   stepMatch,
-  snapshotPucks,
 } from '../src/sim/index.ts'
-import { killPuck } from '../src/sim/world.ts'
+import { spawnPuck } from '../src/sim/world.ts'
 
 const data = loadGameData()
 describe('hit cooldown', () => {
@@ -14,28 +13,23 @@ describe('hit cooldown', () => {
       ...data,
       mode: 'damage',
       seed: 7,
-      roster: {
-        a: { rock: 1, paper: 1, scissors: 0 },
-        b: { rock: 1, paper: 1, scissors: 0 },
-      },
+      opponent: () => null,
     })
 
-    // Keep one rock (team A) and one paper (team B); remove the rest.
-    const all = snapshotPucks(match)
-    const rock = all.find((p) => p.type === 'rock' && p.team === 0)
-    const paper = all.find((p) => p.type === 'paper' && p.team === 1)
-    expect(rock).toBeTruthy()
-    expect(paper).toBeTruthy()
-    for (const p of all) {
-      if (p.id !== rock!.id && p.id !== paper!.id) killPuck(match.world, p.id)
-    }
-
-    const a = rock!
-    const b = paper!
-    match.world.components.Position.x[a.id] = 8
-    match.world.components.Position.y[a.id] = 12
-    match.world.components.Position.x[b.id] = 8.2
-    match.world.components.Position.y[b.id] = 12
+    const rockId = spawnPuck(match.world, {
+      x: 8,
+      y: 12,
+      team: 0,
+      type: 'rock',
+    })
+    const paperId = spawnPuck(match.world, {
+      x: 8.2,
+      y: 12,
+      team: 1,
+      type: 'paper',
+    })
+    const a = { id: rockId }
+    const b = { id: paperId }
     match.world.components.Speed[a.id] = 0
     match.world.components.Speed[b.id] = 0
 

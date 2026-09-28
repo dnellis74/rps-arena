@@ -31,7 +31,7 @@ export type Components = {
 
 export type StateMetrics = {
   /** Cumulative seconds spent in each state across all live pucks. */
-  timeInState: [number, number, number, number]
+  timeInState: [number, number, number, number, number]
   /** Number of state transitions. */
   changes: number
   /** Integral of live puck count over time (puck-seconds). */
@@ -51,7 +51,13 @@ export type SimWorld = {
   timeSinceHit: number
   finished: boolean
   winner: TeamId | null
-  reason: 'elimination' | 'stalemate' | null
+  reason: 'zone' | 'draw' | 'unfinished' | null
+  tick: number
+  charges: [number, number]
+  /** Seconds accumulated toward the next charge, per side. */
+  chargeProgress: [number, number]
+  spawned: [number, number]
+  lost: [number, number]
   stateMetrics: StateMetrics
 }
 
@@ -94,9 +100,14 @@ export function createSimWorld(
     timeSinceHit: 0,
     finished: false,
     winner: null as TeamId | null,
-    reason: null as 'elimination' | 'stalemate' | null,
+    reason: null as 'zone' | 'draw' | 'unfinished' | null,
+    tick: 0,
+    charges: [0, 0],
+    chargeProgress: [0, 0],
+    spawned: [0, 0],
+    lost: [0, 0],
     stateMetrics: {
-      timeInState: [0, 0, 0, 0],
+      timeInState: [0, 0, 0, 0, 0],
       changes: 0,
       puckSeconds: 0,
       transitions: {},
@@ -163,6 +174,8 @@ export function spawnPuck(
 
 export function killPuck(world: EcsWorld, eid: number): void {
   if (!world.components.Alive[eid]) return
+  const team = world.components.Team[eid]!
+  if (team === 0 || team === 1) world.lost[team]++
   world.components.Alive[eid] = 0
   removeEntity(world, eid)
 }

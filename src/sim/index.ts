@@ -17,11 +17,15 @@ export {
   countStatesByTeam,
   totalHp,
   snapshotPucks,
+  queueSpawn,
+  recordedInputs,
 } from './match.ts'
 export type { Match, PuckSnapshot } from './match.ts'
 export { loadGameData } from './data.ts'
 export { buildObservation } from './perception.ts'
-export { expandRoster, rosterSideCount } from './spawn.ts'
+export { spawnZoneCenter, enemySpawnZoneCenter, overlapsSpawnZone } from './spawn.ts'
+export { randomOpponent } from './opponent.ts'
+export type { SpawnChooser, SpawnChoiceState } from './opponent.ts'
 export {
   nearestCounterAlly,
   counterAllyLink,
@@ -39,12 +43,11 @@ export type {
   HpBand,
   TypesData,
   DamageMatrix,
-  SideRoster,
-  RosterData,
   TuningData,
   TeamId,
   SimConfig,
   PuckStateId,
   PuckStateName,
+  SpawnInput,
 } from './types.ts'
 export { PuckStates, PUCK_STATE_NAMES } from './types.ts'

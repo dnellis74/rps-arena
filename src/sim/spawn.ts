@@ -1,66 +1,60 @@
 import type { SeededRng } from './rng.ts'
-import type { SideRoster, TeamId, TypeId, TuningData } from './types.ts'
-import { spawnPuck, type EcsWorld } from './world.ts'
+import type { TeamId, TuningData } from './types.ts'
 
-/** Total pucks spawned on one side from that side's roster counts. */
-export function rosterSideCount(roster: SideRoster): number {
-  let n = 0
-  for (const count of Object.values(roster)) n += count
-  return n
+/** Spawn-zone center. The circle sits inside the arena, tangent to a short edge. */
+export function spawnZoneCenter(
+  tuning: TuningData,
+  team: TeamId,
+): { x: number; y: number } {
+  const x = tuning.arenaWidth / 2
+  const y =
+    team === 0
+      ? tuning.spawnZoneRadius
+      : tuning.arenaHeight - tuning.spawnZoneRadius
+  return { x, y }
 }
 
-/** Expand one side's roster counts into a flat list of type ids, then shuffle. */
-export function expandRoster(roster: SideRoster, rng: SeededRng): TypeId[] {
-  const list: TypeId[] = []
-  for (const [type, count] of Object.entries(roster)) {
-    for (let i = 0; i < count; i++) list.push(type)
-  }
-  return rng.shuffle(list)
+/** Center of the zone this team is trying to reach. */
+export function enemySpawnZoneCenter(
+  tuning: TuningData,
+  team: TeamId,
+): { x: number; y: number } {
+  return spawnZoneCenter(tuning, team === 0 ? 1 : 0)
 }
 
 /**
- * Place pucks in rows within the team's third of the arena, with small jitter.
- * Team A: bottom third. Team B: top third.
+ * Random point in a disk of radius `spawnOffset` around the zone center,
+ * clamped so the unit body stays inside the arena.
  */
-export function spawnTeam(
-  world: EcsWorld,
-  team: TeamId,
-  roster: TypeId[],
+export function spawnPosition(
   tuning: TuningData,
+  team: TeamId,
+  unitRadius: number,
   rng: SeededRng,
-): void {
-  const { arenaWidth: W, arenaHeight: H, spawnJitter } = tuning
-  const third = H / 3
-  const yMin = team === 0 ? 0 : H - third
-  const yMax = team === 0 ? third : H
+): { x: number; y: number } {
+  const center = spawnZoneCenter(tuning, team)
+  const ang = rng.next() * Math.PI * 2
+  const rad = Math.sqrt(rng.next()) * tuning.spawnOffset
+  const x = center.x + Math.cos(ang) * rad
+  const y = center.y + Math.sin(ang) * rad
+  return {
+    x: clamp(x, unitRadius, tuning.arenaWidth - unitRadius),
+    y: clamp(y, unitRadius, tuning.arenaHeight - unitRadius),
+  }
+}
 
-  const cols = Math.ceil(Math.sqrt(roster.length))
-  const rows = Math.ceil(roster.length / cols)
-  const marginX = 1.5
-  const marginY = 1.2
-  const usableW = W - marginX * 2
-  const usableH = yMax - yMin - marginY * 2
-  const cellW = cols > 1 ? usableW / (cols - 1) : 0
-  const cellH = rows > 1 ? usableH / (rows - 1) : 0
-
-  roster.forEach((type, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    const baseX = marginX + (cols === 1 ? usableW / 2 : col * cellW)
-    const baseY =
-      yMin + marginY + (rows === 1 ? usableH / 2 : row * cellH)
-    const x = clamp(
-      baseX + rng.range(-spawnJitter, spawnJitter),
-      0.5,
-      W - 0.5,
-    )
-    const y = clamp(
-      baseY + rng.range(-spawnJitter, spawnJitter),
-      yMin + 0.5,
-      yMax - 0.5,
-    )
-    spawnPuck(world, { x, y, team, type })
-  })
+export function overlapsSpawnZone(
+  tuning: TuningData,
+  team: TeamId,
+  x: number,
+  y: number,
+  radius: number,
+): boolean {
+  const zone = spawnZoneCenter(tuning, team)
+  const reach = radius + tuning.spawnZoneRadius
+  const dx = x - zone.x
+  const dy = y - zone.y
+  return dx * dx + dy * dy <= reach * reach
 }
 
 function clamp(v: number, lo: number, hi: number): number {

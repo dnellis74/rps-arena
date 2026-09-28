@@ -2,10 +2,10 @@
 
 ## 1. Goal
 
-Build a playable rock paper scissors team fight. Per-side puck counts come
-only from `data/roster.json` (not hardcoded in sim or UI). Each side has its
-own counts, so a fight can be asymmetric. All pucks are driven by one
-hand-written behavior. The player is a spectator. No AI models in v0.
+Build a playable rock paper scissors team fight. The playfield starts empty.
+Each side earns spawn charges and spends them to create units. The player
+spends Team A's charges. Team B is a computer opponent. All pucks are driven
+by one hand-written behavior. No AI models in v0.
 
 This version is the baseline. Later versions replace or extend the hand-written
 behavior with model-authored behaviors, which must beat this baseline in
@@ -18,15 +18,18 @@ v0 includes camera zoom and pan (spectator view only).
 - Portrait, phone-first. Arena is 48 x 75 units (1 unit ~ 1 m).
 - Canvas scales to fit the viewport, letterboxed. Must work at 390px width.
 - No obstacles in v0.
-- Team A spawns in the bottom third, Team B in the top third.
-- Spawn order is random per side: shuffle the roster, place pucks in rows with
-  small random jitter.
+- The playfield starts empty. There is no starting roster.
+- Each side has a spawn zone: a circle of radius `spawnZoneRadius` (default
+  1.0). The circle sits against the arena's short edge and is fully inside
+  the field. Team A is centered at `(arenaWidth / 2, spawnZoneRadius)` (bottom).
+  Team B is centered at `(arenaWidth / 2, arenaHeight - spawnZoneRadius)` (top).
+  Both zones are drawn in team color.
 - All randomness comes from one seeded PRNG. The seed is shown on screen and
   can be set with `?seed=` in the URL.
 
-## 3. Types and roster (data-driven)
+## 3. Types (data-driven)
 
-All type stats, matchups, and the roster come from data files, not code.
+All type stats and matchups come from data files, not code.
 v0 values are symmetric. Asymmetric types are on the roadmap.
 
 `data/types.json`: one object per type. Stats and the damage that type deals
@@ -50,12 +53,8 @@ damage matrix.
 - Every attacker has its own 0.8 s hit cooldown.
 - Adding a type (for example lizard and spock) is a data change only.
 
-`data/roster.json`: counts per type for side `a` and side `b`. The sides may
-differ. This is the sole source of how many pucks spawn on each team. Sim and
-UI read it via `loadGameData()`; changing counts is a data edit only. Current
-default: 25 rock / 25 paper / 25 scissors on each side.
-
-`data/tuning.json`: threat radius, gang-up radius, cooldown, stalemate timeout, steering weights.
+`data/tuning.json`: steering, combat, spawn zones, charge rate, and the
+state-machine parameters below. There is no roster file.
 
 Team colors: Team A blue fill, Team B orange fill, white glyph.
 
@@ -104,8 +103,11 @@ Each puck is always in exactly one state. The state persists between ticks and
 has a time-in-state counter. All pucks use identical parameters from
 `data/tuning.json` (no per-puck variation). Initial state is Hunting.
 
-**Hunting**: move toward nearest prey. If none, move toward support ally,
-else drift toward nearby teammates.
+**Hunting**: move toward the nearest prey inside `huntRadius`. Hunting does
+not steer toward a support ally or teammates.
+
+**Advancing**: move toward the enemy spawn zone center. Separation and wall
+steering still apply. New units spawn in Advancing.
 
 **Engaged**: committed to one target (prey, a gang-up predator, or a valid
 same-tier enemy). Move toward that target only.
@@ -127,6 +129,13 @@ Hunting:
 - Predator within `threatEnterRadius` → Retreating, unless finish prey
   applies, then → Engaged with that prey.
 - Prey or valid same-tier enemy within `engageRadius` → Engaged.
+- No prey within `huntRadius` → Advancing.
+
+Advancing:
+- Predator within `threatEnterRadius` → Retreating, unless finish prey
+  applies, then → Engaged with that prey. Gang-up (checked for every state)
+  still takes priority.
+- Prey within `huntRadius` → Hunting.
 
 Engaged:
 - Target dies or is otherwise invalid (dead, same team, or gone) → Regrouping.
@@ -142,7 +151,7 @@ Retreating:
 Regrouping:
 - Predator within `threatEnterRadius` → Retreating.
 - Re-engage lockout expired and prey within `engageRadius` → Engaged.
-- Time in state exceeds `regroupMaxTime` → Hunting.
+- Time in state exceeds `regroupMaxTime` → Advancing.
 
 Re-engage lockout: after leaving Retreating, the puck cannot enter Engaged,
 except via gang-up, for `reengageLockout` seconds.
@@ -167,6 +176,11 @@ switching targets) does not count as a state change.
 | retreatHpFraction | 1/3 |
 | teamLeadHysteresis | 10% of total max HP on both sides' seen HP |
 | maxStateChangesPerSecond | 2 |
+| huntRadius | 8.0 |
+| spawnZoneRadius | 1.0 |
+| chargeInterval | 3.0 s |
+| chargeCap | null (no cap) |
+| spawnOffset | 0.6 |
 
 `threatEnterRadius` replaces the old single `threatRadius` for enter checks.
 `attackOverFlee`, `counterAllyBias`, and `gangUpRadius` remain.
@@ -211,9 +225,11 @@ puck state, then returns a desired direction.
   - Engaged: solid fill in team color
   - Retreating: solid amber fill
   - Regrouping: hollow thick-border square
+  - Advancing: white square, plus a small arrow on the puck pointing along
+    its movement direction
 - Must be readable on a phone at the zoom-out limit. If it is not, increase
   marker size slightly, not puck size.
-- A small legend for the four styles in the UI panel.
+- A small legend for the five styles in the UI panel.
 - Tapped puck: show state name, time in state, current target, and lines to
   target and support ally.
 - Status line: count of pucks in each state per side.
@@ -233,31 +249,72 @@ Combat mode is a match setting:
 - Collision: circle overlap, push both apart along the center line by half the
   overlap. Clamp to arena bounds.
 
-## 6. Win and stalemate
+## 6. Spawn charges
 
-- A team wins when the other has no pucks left.
-- Stalemate is expected (for example only Team A rocks and Team B paper remain:
-  paper chases, rock flees and has no prey). If no hit lands for 20 s, the
-  match ends and the team with more total HP wins. Equal HP is a draw.
-- Applies to all combat modes.
+- Each side gains 1 charge every `chargeInterval` seconds (default 3.0),
+  starting at 0 when the match begins. Progress toward the next charge is
+  continuous; the charge is granted when a full interval has elapsed.
+- Unused charges bank. `chargeCap` in `data/tuning.json` limits the bank.
+  Default is null, which means no cap.
+- Spending a charge spawns one unit of the chosen type at that side's spawn
+  zone center plus a random offset of at most `spawnOffset` units (default
+  0.6), drawn from the seeded PRNG as a point in a disk. The spawn position
+  is clamped inside the arena.
+- Several spawns in the same tick each get their own offset.
+- New units start in Advancing.
+- Player inputs are recorded as `(tick, type)` and applied on that sim tick
+  so a match can be replayed.
 
-## 7. UI
+## 7. Player controls
 
-- Spectator only in v0.
+- Three buttons across the bottom of the screen, outside the arena canvas:
+  R, P, S. Each is at least 44px tall. The row is full width, split three
+  ways, usable with one thumb.
+- The row shows the current charge count and a progress indicator for the
+  next charge.
+- Pressing a button with at least one charge spends it and records
+  `(tick, type)`. With zero charges the button looks disabled and does
+  nothing.
+- Because the buttons sit in the chrome below the canvas, they do not cover
+  the minimap or Team A's spawn zone. The minimap is hidden at the zoom-out
+  limit.
+
+## 8. Computer opponent
+
+- Team B spends every charge on the tick it is gained. It never banks.
+- Each spend is a uniformly random type from the seeded PRNG.
+- The opponent is a function `chooseSpawn(state) -> type | null`. Null means
+  do not spend (used by tests and by a later, smarter opponent). The default
+  opponent returns a random type whenever `state.charges > 0`.
+
+## 9. Victory
+
+- A side wins the moment any of its units overlaps the enemy spawn zone
+  (circle overlap: distance between centers ≤ unit radius + zone radius).
+- If both sides overlap on the same tick, the match is a draw.
+- There is no stalemate timer and no win by emptying the other side.
+- End screen: winner, match time, units spawned per side, units lost per side.
+  A unit is lost when it is removed at 0 HP. Convert is not a loss.
+- Restart with the same seed or a new seed, as before.
+
+## 10. UI
+
+- The player spawns Team A. They do not steer individual pucks.
 - Tap a puck: show type, team, HP, state name, time in state, current target,
   and lines to its Engaged target (when any) and support ally. Prey (green),
   predator (red), counter ally (cyan), and defend ally (violet) lines remain
   when those exist.
 - State marker legend in the UI panel (Hunting empty, Engaged solid team,
-  Retreating amber, Regrouping hollow).
-- Controls: pause (button or Space), 1x, 4x, restart with same seed, restart with new seed,
-  combat mode selector.
-- Status line: seed, elapsed time, pucks remaining per side, and count of
-  pucks in each state per side.
-- End screen: winner, time, survivors, reason (elimination or stalemate).
+  Retreating amber, Regrouping hollow, Advancing arrow).
+- Controls: pause (button or Space), 1x, 4x, restart with same seed, restart
+  with new seed, combat mode selector, and the R / P / S spawn row from
+  section 7.
+- Status line: seed, elapsed time, pucks remaining per side, charge count, and
+  count of pucks in each state per side.
+- End screen: see section 9.
 - Tap targets at least 44px. No layout breakage at 390px width.
 
-## 8. Camera
+## 11. Camera
 
 - Camera state lives in the rendering layer only. The sim has no knowledge of
   the camera. Headless runs and determinism are unaffected.
@@ -301,7 +358,7 @@ Tests (headless, camera math only):
 - Zoom limits respected, including the case where no zoom is available.
 - Screen-to-world and world-to-screen round trip.
 
-## 9. Technical
+## 12. Technical
 
 - TypeScript strict, Vite, single Canvas 2D.
 - bitECS for entity storage.
@@ -310,28 +367,31 @@ Tests (headless, camera math only):
 
 ### Tests
 
-- Determinism: same seed and mode give identical results.
+- Charges accumulate at `chargeInterval` and bank when `chargeCap` is null.
+- `chargeCap`, when set, is respected.
+- Spawning spends a charge. Zero charges spawns nothing.
+- Multiple spawns in the same tick get distinct offsets.
+- Zone victory triggers on overlap and not before. A lone unit on an empty
+  field advances into the enemy zone and wins.
+- The default computer spends every charge on the tick it arrives.
+- Determinism: the same seed and the same list of player inputs `(tick, type)`
+  give the same result.
 - Relationship derivation from the damage matrix.
 - Gang-up threshold derivation from the data.
 - HP band perception at band edges.
 - Hit cooldown.
-- Stalemate timer.
 - State machine: each transition above with a constructed scenario; re-engage
   lockout blocks Engaged but not gang-up; Engaged ends on target death, low
   HP, and timeout; separation does not push away from the Engaged target.
-- Batch: 100 headless matches per combat mode, reporting win rate per side,
-  draw rate, stalemate rate, mean match length, state changes per puck per
-  minute, and time share in each state. With symmetric data, side win rates
-  should be close to even.
 
 Do not automate UI testing. A person checks it on a phone.
 
-## 10. Out of scope for v0
+## 13. Out of scope for v0
 
 Models (Jev, Astra), player orders, abilities, obstacles, shared blackboard,
 sound, art.
 
-## 11. Roadmap
+## 14. Roadmap
 
 - Asymmetric types via data.
 - Additional types (rock paper scissors lizard spock).

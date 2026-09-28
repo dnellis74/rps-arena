@@ -3,7 +3,6 @@
   "arenaHeight": 75,
   "gangUpRadius": 3,
   "hitCooldown": 0.8,
-  "stalemateTimeout": 40,
   "separationRadius": 1.2,
   "wallMargin": 2.5,
   "weights": {
@@ -26,5 +25,10 @@
   "regroupMaxTime": 3.0,
   "retreatHpFraction": 0.3333333333333333,
   "teamLeadHysteresis": 0.1,
-  "maxStateChangesPerSecond": 2
+  "maxStateChangesPerSecond": 2,
+  "huntRadius": 8,
+  "spawnZoneRadius": 1,
+  "chargeInterval": 3,
+  "chargeCap": null,
+  "spawnOffset": 0.6
 }

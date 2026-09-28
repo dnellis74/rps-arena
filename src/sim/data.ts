@@ -1,14 +1,6 @@
-import type {
-  DamageMatrix,
-  RosterData,
-  TuningData,
-  TypeDef,
-  TypeId,
-  TypesData,
-} from './types.ts'
+import type { DamageMatrix, TuningData, TypeDef, TypeId, TypesData } from './types.ts'
 
 import typesJson from '../../data/types.json'
-import rosterJson from '../../data/roster.json'
 import tuningJson from '../../data/tuning.json'
 
 type TypeFileEntry = TypeDef & { damage: Record<TypeId, number> }
@@ -31,14 +23,12 @@ function splitTypes(file: Record<string, TypeFileEntry>): {
 export function loadGameData(): {
   types: TypesData
   damage: DamageMatrix
-  roster: RosterData
   tuning: TuningData
 } {
   const { types, damage } = splitTypes(typesJson as Record<string, TypeFileEntry>)
   return {
     types,
     damage,
-    roster: rosterJson as RosterData,
     tuning: tuningJson as TuningData,
   }
 }

@@ -7,6 +7,7 @@ import {
   type PuckStateId,
   type SeenEntity,
 } from './types.ts'
+import { enemySpawnZoneCenter } from './spawn.ts'
 import { recordTransition, type EcsWorld } from './world.ts'
 
 export type Intent = { x: number; y: number }
@@ -73,20 +74,15 @@ function applyTransitions(
   const state = components.State[eid]! as PuckStateId
 
   if (state === PuckStates.Hunting) {
-    const pred = nearestWithin(obs.predators, tuning.threatEnterRadius)
-    if (pred) {
-      const prey = obs.prey[0]
-      if (finishPreyApplies(pred, prey, tuning.attackOverFlee)) {
-        enter(world, eid, PuckStates.Engaged, prey!.id, 'hunting:finishPrey')
-        return
-      }
-      enter(world, eid, PuckStates.Retreating, -1, 'hunting:predator')
-      return
-    }
+    if (respondToPredator(world, eid, obs, 'hunting')) return
     const engage = nearestEngageCandidate(obs, tuning.engageRadius)
     if (engage && canEnterEngaged(world, eid)) {
       enter(world, eid, PuckStates.Engaged, engage.id, 'hunting:engage')
       return
+    }
+    const prey = nearestWithin(obs.prey, tuning.huntRadius)
+    if (!prey) {
+      enter(world, eid, PuckStates.Advancing, -1, 'hunting:noPrey')
     }
     return
   }
@@ -145,7 +141,16 @@ function applyTransitions(
       return
     }
     if (components.TimeInState[eid]! >= tuning.regroupMaxTime) {
-      enter(world, eid, PuckStates.Hunting, -1, 'regrouping:timeout')
+      enter(world, eid, PuckStates.Advancing, -1, 'regrouping:timeout')
+    }
+    return
+  }
+
+  if (state === PuckStates.Advancing) {
+    if (respondToPredator(world, eid, obs, 'advancing')) return
+    const prey = nearestWithin(obs.prey, tuning.huntRadius)
+    if (prey) {
+      enter(world, eid, PuckStates.Hunting, -1, 'advancing:prey')
     }
   }
 }
@@ -197,21 +202,40 @@ function intentForState(
     return { x: 0, y: 0 }
   }
 
-  // Hunting
-  const prey = obs.prey[0]
-  if (prey) return { x: prey.dx, y: prey.dy }
-  if (support) return { x: support.dx, y: support.dy }
-  if (obs.teammates.length > 0) {
-    let sx = 0
-    let sy = 0
-    const n = Math.min(3, obs.teammates.length)
-    for (let i = 0; i < n; i++) {
-      sx += obs.teammates[i]!.dx
-      sy += obs.teammates[i]!.dy
-    }
-    return { x: sx / n, y: sy / n }
+  if (state === PuckStates.Advancing) return advanceIntent(world, eid)
+
+  // Hunting: only prey inside huntRadius.
+  const hunted = nearestWithin(obs.prey, tuning.huntRadius)
+  if (hunted) return { x: hunted.dx, y: hunted.dy }
+  return advanceIntent(world, eid)
+}
+
+function advanceIntent(world: EcsWorld, eid: number): Intent {
+  const { components, tuning } = world
+  const team = components.Team[eid] as 0 | 1
+  const zone = enemySpawnZoneCenter(tuning, team)
+  return {
+    x: zone.x - components.Position.x[eid]!,
+    y: zone.y - components.Position.y[eid]!,
   }
-  return { x: 0, y: 0 }
+}
+
+/** Predator response shared by Hunting and Advancing. Returns true if it handled the tick. */
+function respondToPredator(
+  world: EcsWorld,
+  eid: number,
+  obs: Observation,
+  from: 'hunting' | 'advancing',
+): boolean {
+  const pred = nearestWithin(obs.predators, world.tuning.threatEnterRadius)
+  if (!pred) return false
+  const prey = obs.prey[0]
+  if (finishPreyApplies(pred, prey, world.tuning.attackOverFlee)) {
+    enter(world, eid, PuckStates.Engaged, prey!.id, `${from}:finishPrey`)
+    return true
+  }
+  enter(world, eid, PuckStates.Retreating, -1, `${from}:predator`)
+  return true
 }
 
 function enter(

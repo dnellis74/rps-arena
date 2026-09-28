@@ -1,5 +1,6 @@
 import type { Match, PuckSnapshot } from '../sim/match.ts'
 import { buildObservation } from '../sim/perception.ts'
+import { spawnZoneCenter } from '../sim/spawn.ts'
 import {
   counterAllyLink,
   nearestDefendAlly,
@@ -48,6 +49,8 @@ export function drawFrame(
     ctx.lineTo(b.x, b.y)
     ctx.stroke()
   }
+
+  drawSpawnZones(ctx, cam, tuning)
 
   if (selectedId !== null) {
     const sel = pucks.find((p) => p.id === selectedId)
@@ -112,6 +115,7 @@ export function drawFrame(
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2)
     ctx.fillStyle = TEAM_FILL[p.team]
     ctx.fill()
+    if (p.state === PuckStates.Advancing) drawAdvanceArrow(ctx, c.x, c.y, r, p)
 
     if (selectedId === p.id) {
       ctx.setLineDash([])
@@ -171,10 +175,69 @@ function drawStateMark(
     ctx.fillRect(x, y, size, size)
     return
   }
+  if (p.state === PuckStates.Advancing) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(x, y, size, size)
+    return
+  }
   // Regrouping: hollow square with thick border.
   ctx.strokeStyle = '#9ec0ff'
   ctx.lineWidth = 2
   ctx.strokeRect(x + 1, y + 1, size - 2, size - 2)
+}
+
+function drawAdvanceArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  p: PuckSnapshot,
+): void {
+  let sx = p.vx
+  let sy = -p.vy
+  if (Math.hypot(sx, sy) < 1e-3) {
+    sx = 0
+    sy = p.team === 0 ? -1 : 1
+  }
+  const len = Math.hypot(sx, sy) || 1
+  sx /= len
+  sy /= len
+  const px = -sy
+  const py = sx
+  const reach = Math.max(7, r * 1.15)
+  const tipX = x + sx * reach
+  const tipY = y + sy * reach
+  const base = Math.max(3.5, r * 0.45)
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.moveTo(tipX, tipY)
+  ctx.lineTo(x + px * base, y + py * base)
+  ctx.lineTo(x - px * base, y - py * base)
+  ctx.closePath()
+  ctx.fill()
+}
+
+function drawSpawnZones(
+  ctx: CanvasRenderingContext2D,
+  cam: Camera,
+  matchTuning: { arenaWidth: number; arenaHeight: number; spawnZoneRadius: number },
+): void {
+  for (const team of [0, 1] as const) {
+    const zone = spawnZoneCenter(
+      matchTuning as Parameters<typeof spawnZoneCenter>[0],
+      team,
+    )
+    const c = worldToScreen(cam, zone.x, zone.y)
+    const rr = matchTuning.spawnZoneRadius * cam.scale
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, rr, 0, Math.PI * 2)
+    ctx.fillStyle =
+      team === 0 ? 'rgba(47, 111, 237, 0.28)' : 'rgba(232, 122, 42, 0.28)'
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = TEAM_FILL[team]
+    ctx.stroke()
+  }
 }
 
 function drawMinimap(

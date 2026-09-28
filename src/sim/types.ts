@@ -13,20 +13,11 @@ export type TypeDef = {
 
 export type TypesData = Record<TypeId, TypeDef>
 export type DamageMatrix = Record<TypeId, Record<TypeId, number>>
-/** Counts of each type on one team. */
-export type SideRoster = Record<TypeId, number>
-/** Per-side type counts. The two sides may differ. */
-export type RosterData = {
-  a: SideRoster
-  b: SideRoster
-}
-
 export type TuningData = {
   arenaWidth: number
   arenaHeight: number
   gangUpRadius: number
   hitCooldown: number
-  stalemateTimeout: number
   separationRadius: number
   wallMargin: number
   weights: {
@@ -76,16 +67,27 @@ export type TuningData = {
   teamLeadHysteresis: number
   /** Cap on how often a puck may change state (retarget within a state free). */
   maxStateChangesPerSecond: number
+  /** Hunting tracks prey only inside this distance. */
+  huntRadius: number
+  /** Radius of each side's spawn-zone circle. */
+  spawnZoneRadius: number
+  /** Seconds between charge gains. */
+  chargeInterval: number
+  /** Max banked charges. Null means no cap. */
+  chargeCap: number | null
+  /** Spawn disk radius around the zone center. */
+  spawnOffset: number
 }
 
 /** Persisted behavior state for each puck. */
-export type PuckStateId = 0 | 1 | 2 | 3
+export type PuckStateId = 0 | 1 | 2 | 3 | 4
 
 export const PuckStates = {
   Hunting: 0 as PuckStateId,
   Engaged: 1 as PuckStateId,
   Retreating: 2 as PuckStateId,
   Regrouping: 3 as PuckStateId,
+  Advancing: 4 as PuckStateId,
 }
 
 export const PUCK_STATE_NAMES = [
@@ -93,6 +95,7 @@ export const PUCK_STATE_NAMES = [
   'Engaged',
   'Retreating',
   'Regrouping',
+  'Advancing',
 ] as const
 
 export type PuckStateName = (typeof PUCK_STATE_NAMES)[number]
@@ -141,21 +144,29 @@ export type BehaviorFn = (observation: Observation) => { x: number; y: number }
 
 export type MatchResult = {
   winner: TeamId | null
-  reason: 'elimination' | 'stalemate'
+  reason: 'zone' | 'draw' | 'unfinished'
   elapsed: number
   survivorsA: number
   survivorsB: number
-  totalHpA: number
-  totalHpB: number
+  spawnedA: number
+  spawnedB: number
+  lostA: number
+  lostB: number
   seed: number
   mode: CombatMode
+}
+
+/** Player spawn recorded for replay. Applied at the start of `tick`. */
+export type SpawnInput = {
+  tick: number
+  type: TypeId
 }
 
 export type SimConfig = {
   types: TypesData
   damage: DamageMatrix
-  roster: RosterData
   tuning: TuningData
   mode: CombatMode
   seed: number
+  inputs?: SpawnInput[]
 }

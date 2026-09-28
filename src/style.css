@@ -188,6 +188,56 @@ body {
   background: transparent;
 }
 
+.state-legend .leg-adv {
+  border: none;
+  background: #ffffff;
+}
+
+.spawn-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.charges {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.charge-track {
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.charge-track div {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.spawn-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.controls button.spawn {
+  min-height: var(--tap);
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
+
+.controls button.spawn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: #262b3a;
+  color: var(--muted);
+}
+
 .end-screen {
   position: absolute;
   inset: 0;
