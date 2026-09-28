@@ -55,6 +55,7 @@ let mode: CombatMode = 'damage'
 let match: Match = makeMatch(seed, mode)
 let selectedId: number | null = null
 let speed: Speed = 1
+let titleOpen = true
 let accumulator = 0
 let lastTs = performance.now()
 
@@ -68,6 +69,17 @@ app.innerHTML = `
     <canvas id="arena"></canvas>
     <div class="inspect" id="inspect"></div>
     <div class="end-screen hidden" id="end"></div>
+    <div class="title-screen" id="title">
+      <div class="title-card">
+        <h1>RPS Arena</h1>
+        <ul>
+          <li>Spawn automated bots to reach the opponent's spawn point.</li>
+          <li>Spawn points earned with time.</li>
+          <li>Press 'R', 'P', or 'S' to spawn the three classic types of bots.</li>
+        </ul>
+        <button type="button" id="btn-start">Play</button>
+      </div>
+    </div>
   </div>
   <div class="controls">
     <button type="button" id="btn-pause" aria-label="Pause">Pause</button>
@@ -104,6 +116,8 @@ const ctx = canvas.getContext('2d')!
 const statusEl = document.querySelector<HTMLDivElement>('#status')!
 const inspectEl = document.querySelector<HTMLDivElement>('#inspect')!
 const endEl = document.querySelector<HTMLDivElement>('#end')!
+const titleEl = document.querySelector<HTMLDivElement>('#title')!
+const btnStart = document.querySelector<HTMLButtonElement>('#btn-start')!
 const btnPause = document.querySelector<HTMLButtonElement>('#btn-pause')!
 const btn1x = document.querySelector<HTMLButtonElement>('#btn-1x')!
 const btn4x = document.querySelector<HTMLButtonElement>('#btn-4x')!
@@ -170,22 +184,44 @@ modeSelect.addEventListener('change', () => {
   restart(seed, modeSelect.value as CombatMode)
 })
 
+function dismissTitle(): void {
+  if (!titleOpen) return
+  titleOpen = false
+  titleEl.classList.add('hidden')
+  lastTs = performance.now()
+  accumulator = 0
+}
+
+btnStart.addEventListener('click', dismissTitle)
+
+function spawnType(type: TypeId): void {
+  if (titleOpen || match.world.finished) return
+  queueSpawn(match, type)
+  updateSpawnControls()
+}
+
 for (const type of ['rock', 'paper', 'scissors'] as const) {
-  spawnButtons[type].addEventListener('click', () => {
-    if (match.world.finished) return
-    queueSpawn(match, type as TypeId)
-    updateSpawnControls()
-  })
+  spawnButtons[type].addEventListener('click', () => spawnType(type))
 }
 
 window.addEventListener('keydown', (ev) => {
-  if (ev.code !== 'Space' && ev.key !== ' ') return
   const t = ev.target as HTMLElement | null
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
     return
   }
-  ev.preventDefault()
-  setSpeed(speed === 0 ? 1 : 0)
+  if (titleOpen && (ev.key === 'Enter' || ev.key === ' ')) {
+    ev.preventDefault()
+    dismissTitle()
+    return
+  }
+  const key = ev.key.toLowerCase()
+  if (key === 'r') spawnType('rock')
+  else if (key === 'p') spawnType('paper')
+  else if (key === 's') spawnType('scissors')
+  else if (ev.code === 'Space' || ev.key === ' ') {
+    ev.preventDefault()
+    setSpeed(speed === 0 ? 1 : 0)
+  }
 })
 
 /** CSS-pixel coords → canvas-pixel coords. */
@@ -454,7 +490,7 @@ function frame(ts: number): void {
   const realDt = Math.min(0.05, (ts - lastTs) / 1000)
   lastTs = ts
 
-  if (speed > 0 && !match.world.finished) {
+  if (!titleOpen && speed > 0 && !match.world.finished) {
     accumulator += realDt * speed
     const step = data.tuning.fixedDt
     let guard = 0

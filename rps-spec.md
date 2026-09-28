@@ -225,8 +225,7 @@ puck state, then returns a desired direction.
   - Engaged: solid fill in team color
   - Retreating: solid amber fill
   - Regrouping: hollow thick-border square
-  - Advancing: white square, plus a small arrow on the puck pointing along
-    its movement direction
+  - Advancing: white square
 - Must be readable on a phone at the zoom-out limit. If it is not, increase
   marker size slightly, not puck size.
 - A small legend for the five styles in the UI panel.
@@ -305,7 +304,7 @@ Combat mode is a match setting:
   predator (red), counter ally (cyan), and defend ally (violet) lines remain
   when those exist.
 - State marker legend in the UI panel (Hunting empty, Engaged solid team,
-  Retreating amber, Regrouping hollow, Advancing arrow).
+  Retreating amber, Regrouping hollow, Advancing white).
 - Controls: pause (button or Space), 1x, 4x, restart with same seed, restart
   with new seed, combat mode selector, and the R / P / S spawn row from
   section 7.

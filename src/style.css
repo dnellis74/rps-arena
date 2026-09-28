@@ -248,8 +248,59 @@ body {
   padding: 16px;
 }
 
-.end-screen.hidden {
+.end-screen.hidden,
+.title-screen.hidden {
   display: none;
+}
+
+.title-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 16, 0.88);
+  padding: 20px;
+}
+
+.title-card {
+  width: min(420px, 100%);
+  text-align: left;
+}
+
+.title-card h1 {
+  margin: 0 0 18px;
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.title-card ul {
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.title-card li + li {
+  margin-top: 12px;
+}
+
+.title-card button {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .end-card {

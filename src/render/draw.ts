@@ -115,7 +115,6 @@ export function drawFrame(
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2)
     ctx.fillStyle = TEAM_FILL[p.team]
     ctx.fill()
-    if (p.state === PuckStates.Advancing) drawAdvanceArrow(ctx, c.x, c.y, r, p)
 
     if (selectedId === p.id) {
       ctx.setLineDash([])
@@ -184,37 +183,6 @@ function drawStateMark(
   ctx.strokeStyle = '#9ec0ff'
   ctx.lineWidth = 2
   ctx.strokeRect(x + 1, y + 1, size - 2, size - 2)
-}
-
-function drawAdvanceArrow(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  p: PuckSnapshot,
-): void {
-  let sx = p.vx
-  let sy = -p.vy
-  if (Math.hypot(sx, sy) < 1e-3) {
-    sx = 0
-    sy = p.team === 0 ? -1 : 1
-  }
-  const len = Math.hypot(sx, sy) || 1
-  sx /= len
-  sy /= len
-  const px = -sy
-  const py = sx
-  const reach = Math.max(7, r * 1.15)
-  const tipX = x + sx * reach
-  const tipY = y + sy * reach
-  const base = Math.max(3.5, r * 0.45)
-  ctx.fillStyle = '#ffffff'
-  ctx.beginPath()
-  ctx.moveTo(tipX, tipY)
-  ctx.lineTo(x + px * base, y + py * base)
-  ctx.lineTo(x - px * base, y - py * base)
-  ctx.closePath()
-  ctx.fill()
 }
 
 function drawSpawnZones(
