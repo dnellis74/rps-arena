@@ -109,13 +109,42 @@ body {
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--panel);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
+}
+
+.spawn-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.charge-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#btn-tray {
+  flex-shrink: 0;
+  min-width: 88px;
+}
+
+.tray {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.tray[hidden] {
+  display: none;
 }
 
 .controls button,
@@ -140,7 +169,7 @@ body {
 }
 
 .controls select {
-  grid-column: span 2;
+  grid-column: span 3;
 }
 
 .state-legend {
@@ -194,7 +223,6 @@ body {
 }
 
 .spawn-bar {
-  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -336,11 +364,5 @@ body {
   }
   .status {
     font-size: 0.68rem;
-  }
-  .controls {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .controls select {
-    grid-column: span 3;
   }
 }

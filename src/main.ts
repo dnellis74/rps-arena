@@ -82,26 +82,33 @@ app.innerHTML = `
     </div>
   </div>
   <div class="controls">
-    <button type="button" id="btn-pause" aria-label="Pause">Pause</button>
-    <button type="button" id="btn-1x" class="active" aria-label="1x speed">1x</button>
-    <button type="button" id="btn-4x" aria-label="4x speed">4x</button>
-    <button type="button" id="btn-restart" aria-label="Restart same seed">Same seed</button>
-    <button type="button" id="btn-new" aria-label="Restart new seed">New seed</button>
-    <select id="mode" aria-label="Combat mode">
-      <option value="damage">Damage</option>
-      <option value="instant_kill">Instant kill</option>
-      <option value="convert">Convert</option>
-    </select>
-    <div class="state-legend" aria-label="State marker legend">
-      <span><i class="leg-hunt"></i>Hunt</span>
-      <span><i class="leg-eng"></i>Engage</span>
-      <span><i class="leg-ret"></i>Retreat</span>
-      <span><i class="leg-reg"></i>Regroup</span>
-      <span><i class="leg-adv"></i>Advance</span>
+    <div class="spawn-meta">
+      <div class="charge-col">
+        <div class="charges" id="charges">Charges 0</div>
+        <div class="charge-track" aria-hidden="true"><div id="charge-fill"></div></div>
+      </div>
+      <button type="button" id="btn-tray" aria-expanded="false" aria-controls="tray">Controls</button>
+    </div>
+    <div class="tray" id="tray" hidden>
+      <button type="button" id="btn-pause" aria-label="Pause">Pause</button>
+      <button type="button" id="btn-1x" class="active" aria-label="1x speed">1x</button>
+      <button type="button" id="btn-4x" aria-label="4x speed">4x</button>
+      <button type="button" id="btn-restart" aria-label="Restart same seed">Same seed</button>
+      <button type="button" id="btn-new" aria-label="Restart new seed">New seed</button>
+      <select id="mode" aria-label="Combat mode">
+        <option value="damage">Damage</option>
+        <option value="instant_kill">Instant kill</option>
+        <option value="convert">Convert</option>
+      </select>
+      <div class="state-legend" aria-label="State marker legend">
+        <span><i class="leg-hunt"></i>Hunt</span>
+        <span><i class="leg-eng"></i>Engage</span>
+        <span><i class="leg-ret"></i>Retreat</span>
+        <span><i class="leg-reg"></i>Regroup</span>
+        <span><i class="leg-adv"></i>Advance</span>
+      </div>
     </div>
     <div class="spawn-bar">
-      <div class="charges" id="charges">Charges 0</div>
-      <div class="charge-track" aria-hidden="true"><div id="charge-fill"></div></div>
       <div class="spawn-buttons">
         <button type="button" id="spawn-rock" class="spawn" disabled>R</button>
         <button type="button" id="spawn-paper" class="spawn" disabled>P</button>
@@ -124,6 +131,8 @@ const btn4x = document.querySelector<HTMLButtonElement>('#btn-4x')!
 const btnRestart = document.querySelector<HTMLButtonElement>('#btn-restart')!
 const btnNew = document.querySelector<HTMLButtonElement>('#btn-new')!
 const modeSelect = document.querySelector<HTMLSelectElement>('#mode')!
+const trayEl = document.querySelector<HTMLDivElement>('#tray')!
+const btnTray = document.querySelector<HTMLButtonElement>('#btn-tray')!
 const chargesEl = document.querySelector<HTMLDivElement>('#charges')!
 const chargeFill = document.querySelector<HTMLDivElement>('#charge-fill')!
 const spawnButtons = {
@@ -182,6 +191,14 @@ btnRestart.addEventListener('click', () => restart(seed))
 btnNew.addEventListener('click', () => restart(randomSeed()))
 modeSelect.addEventListener('change', () => {
   restart(seed, modeSelect.value as CombatMode)
+})
+
+btnTray.addEventListener('click', () => {
+  const open = trayEl.hasAttribute('hidden')
+  trayEl.toggleAttribute('hidden', !open)
+  btnTray.setAttribute('aria-expanded', open ? 'true' : 'false')
+  btnTray.textContent = open ? 'Hide' : 'Controls'
+  resize()
 })
 
 function dismissTitle(): void {
