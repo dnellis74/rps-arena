@@ -24,7 +24,6 @@ export type RosterData = {
 export type TuningData = {
   arenaWidth: number
   arenaHeight: number
-  threatRadius: number
   gangUpRadius: number
   hitCooldown: number
   stalemateTimeout: number
@@ -38,24 +37,65 @@ export type TuningData = {
   spawnJitter: number
   fixedDt: number
   /**
-   * When a predator is in threat range, still Seek if nearest prey distance is
-   * at most predatorDist * attackOverFlee. Slightly favors finishing kills over
-   * running from a more distant predator.
+   * When a predator is in threat range, still engage prey if nearest prey
+   * distance is at most predatorDist * attackOverFlee.
    */
   attackOverFlee: number
   /**
-   * Preferred keep-clear range for same-tier without HP advantage.
-   * ~2 circle widths (diameters); with radius 0.5 that is 2.0 units.
+   * Preferred keep-clear range for same-tier without HP advantage (legacy;
+   * hunting no longer uses active keep-clear steering).
    */
   standoffDistance: number
   /** Short-side puck diameters at max zoom-in (camera; render-only). */
   maxZoomInPucksAcross: number
   /**
-   * When fleeing, blend this much of the unit direction toward the counter
-   * ally (nearest teammate that preys on the pursuer's type) into flee intent.
+   * When retreating, blend this much of the unit direction toward the support
+   * ally into flee intent.
    */
   counterAllyBias: number
+  /** Distance at which prey / valid same-tier can pull a puck into Engaged. */
+  engageRadius: number
+  /** Max seconds to stay Engaged before regrouping. */
+  engageMaxTime: number
+  /** Predator distance that triggers retreat / gang-up enter checks. */
+  threatEnterRadius: number
+  /** Predator distance beyond which retreat ends. */
+  threatExitRadius: number
+  /** Distance to support ally that ends retreat. */
+  supportAllyRadius: number
+  /** Seconds after leaving Retreating before Engaged is allowed (except gang-up). */
+  reengageLockout: number
+  /** Max seconds in Regrouping before returning to Hunting. */
+  regroupMaxTime: number
+  /** Own HP at or below this fraction of max HP forces Retreating from Engaged. */
+  retreatHpFraction: number
+  /**
+   * Fraction of combined seen max HP: team lead flag flips only when the
+   * seen-HP difference exceeds this margin.
+   */
+  teamLeadHysteresis: number
+  /** Cap on how often a puck may change state (retarget within a state free). */
+  maxStateChangesPerSecond: number
 }
+
+/** Persisted behavior state for each puck. */
+export type PuckStateId = 0 | 1 | 2 | 3
+
+export const PuckStates = {
+  Hunting: 0 as PuckStateId,
+  Engaged: 1 as PuckStateId,
+  Retreating: 2 as PuckStateId,
+  Regrouping: 3 as PuckStateId,
+}
+
+export const PUCK_STATE_NAMES = [
+  'Hunting',
+  'Engaged',
+  'Retreating',
+  'Regrouping',
+] as const
+
+export type PuckStateName = (typeof PUCK_STATE_NAMES)[number]
 
 export type CombatMode = 'damage' | 'instant_kill' | 'convert'
 
@@ -118,5 +158,4 @@ export type SimConfig = {
   tuning: TuningData
   mode: CombatMode
   seed: number
-  behavior: BehaviorFn
 }

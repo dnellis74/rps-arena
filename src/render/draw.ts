@@ -1,7 +1,11 @@
 import type { Match, PuckSnapshot } from '../sim/match.ts'
 import { buildObservation } from '../sim/perception.ts'
-import { counterAllyLink } from '../sim/targeting.ts'
-import type { CombatMode, TeamId } from '../sim/types.ts'
+import {
+  counterAllyLink,
+  nearestDefendAlly,
+  supportAlly,
+} from '../sim/targeting.ts'
+import { PuckStates, type CombatMode, type TeamId } from '../sim/types.ts'
 import {
   minimapLayout,
   visibleWorldRect,
@@ -45,7 +49,6 @@ export function drawFrame(
     ctx.stroke()
   }
 
-  // Selection lines: prey (green), predator (red), counter-ally (cyan)
   if (selectedId !== null) {
     const sel = pucks.find((p) => p.id === selectedId)
     if (sel) {
@@ -76,6 +79,28 @@ export function drawFrame(
         )
         strokeLine(ctx, from, t, 'rgba(80, 210, 230, 0.9)', 2)
       }
+      const defend = nearestDefendAlly(obs, match.damage)
+      if (defend) {
+        const t = worldToScreen(cam, sel.x + defend.dx, sel.y + defend.dy)
+        strokeLine(ctx, from, t, 'rgba(186, 140, 255, 0.9)', 2)
+      }
+      if (sel.targetId !== null) {
+        const tgt = pucks.find((p) => p.id === sel.targetId)
+        if (tgt) {
+          const t = worldToScreen(cam, tgt.x, tgt.y)
+          strokeLine(ctx, from, t, 'rgba(255, 220, 80, 0.95)', 2.5)
+        }
+      }
+      const losing = match.world.components.TeamLead[sel.id]! < 0
+      const support = supportAlly(obs, match.damage, losing)
+      if (support) {
+        const t = worldToScreen(
+          cam,
+          sel.x + support.dx,
+          sel.y + support.dy,
+        )
+        strokeLine(ctx, from, t, 'rgba(255, 255, 255, 0.55)', 1.5)
+      }
     }
   }
 
@@ -89,8 +114,11 @@ export function drawFrame(
     ctx.fill()
 
     if (selectedId === p.id) {
+      ctx.setLineDash([])
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.arc(c.x, c.y, r + 3, 0, Math.PI * 2)
       ctx.stroke()
     }
 
@@ -100,14 +128,53 @@ export function drawFrame(
     ctx.textBaseline = 'middle'
     ctx.fillText(p.glyph, c.x, c.y + 0.5)
 
+    const barW = r * 2
+    const barH = 3
+    const barX = c.x - r
+    const barY = c.y + r + 2
     const hpFrac = p.hp / p.maxHp
     ctx.fillStyle = 'rgba(0,0,0,0.35)'
-    ctx.fillRect(c.x - r, c.y + r + 2, r * 2, 3)
+    ctx.fillRect(barX, barY, barW, barH)
     ctx.fillStyle = hpFrac > 0.34 ? '#9fe870' : '#f0c040'
-    ctx.fillRect(c.x - r, c.y + r + 2, r * 2 * hpFrac, 3)
+    ctx.fillRect(barX, barY, barW * hpFrac, barH)
+
+    // State marker: small square at the base of the HP bar.
+    const mark = Math.max(4, Math.min(7, barH + 2))
+    drawStateMark(ctx, barX - mark - 1, barY + (barH - mark) / 2, mark, p)
   }
 
   drawMinimap(ctx, cam, pucks)
+}
+
+function drawStateMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  p: PuckSnapshot,
+): void {
+  ctx.setLineDash([])
+  ctx.lineWidth = 1.25
+  if (p.state === PuckStates.Hunting) {
+    // Empty square — hunting has no fill.
+    ctx.strokeStyle = 'rgba(200, 210, 230, 0.55)'
+    ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1)
+    return
+  }
+  if (p.state === PuckStates.Engaged) {
+    ctx.fillStyle = TEAM_FILL[p.team]
+    ctx.fillRect(x, y, size, size)
+    return
+  }
+  if (p.state === PuckStates.Retreating) {
+    ctx.fillStyle = '#f0c040'
+    ctx.fillRect(x, y, size, size)
+    return
+  }
+  // Regrouping: hollow square with thick border.
+  ctx.strokeStyle = '#9ec0ff'
+  ctx.lineWidth = 2
+  ctx.strokeRect(x + 1, y + 1, size - 2, size - 2)
 }
 
 function drawMinimap(
@@ -123,7 +190,6 @@ function drawMinimap(
   ctx.strokeStyle = 'rgba(255,255,255,0.18)'
   ctx.lineWidth = 1
   ctx.beginPath()
-  // roundRect is widely supported; fall back to rect if missing.
   if (typeof ctx.roundRect === 'function') {
     ctx.roundRect(x, y, size, size, 6)
   } else {
@@ -168,6 +234,7 @@ function strokeLine(
   color: string,
   width: number,
 ): void {
+  ctx.setLineDash([])
   ctx.strokeStyle = color
   ctx.lineWidth = width
   ctx.beginPath()

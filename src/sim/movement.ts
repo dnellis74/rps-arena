@@ -1,22 +1,18 @@
 import { buildObservation } from './perception.ts'
-import type { BehaviorFn, DamageMatrix } from './types.ts'
-import { aliveEntities, typeIdOf, type EcsWorld } from './world.ts'
+import { stepPuckFsm } from './fsm.ts'
+import type { DamageMatrix } from './types.ts'
+import { PuckStates } from './types.ts'
+import { aliveEntities, type EcsWorld } from './world.ts'
 
 /**
- * Apply behavior intent + separation + wall avoidance, then integrate position.
+ * Apply FSM intent + separation + wall avoidance, then integrate position.
  *
- * Intent is a direction (normalized) per spec §4. Separation skips enemies this
- * puck preys on so Seek can close to contact. Wall push that fights the intent
- * is dropped while closing on an enemy ahead — otherwise cornered prey stall
- * outside hit range. Full walls remain when fleeing (enemy is behind intent).
- *
- * "Keep clear" lives only in behavior for same-tier without HP advantage; rock
- * vs scissors is prey and must engage.
+ * Separation exempts the current Engaged target (any type). Wall push that
+ * fights the intent is dropped while closing on an enemy ahead.
  */
 export function stepMovement(
   world: EcsWorld,
   damage: DamageMatrix,
-  behavior: BehaviorFn,
   dt: number,
 ): void {
   const { components, tuning } = world
@@ -27,7 +23,7 @@ export function stepMovement(
 
   for (const eid of eids) {
     const obs = buildObservation(world, eid, damage)
-    const raw = behavior(obs)
+    const raw = stepPuckFsm(world, eid, obs, damage, dt)
 
     let ix = raw.x
     let iy = raw.y
@@ -45,8 +41,10 @@ export function stepMovement(
 
     const ox = components.Position.x[eid]!
     const oy = components.Position.y[eid]!
-    const selfType = typeIdOf(world, eid)
-    const selfTeam = components.Team[eid]!
+    const engagedTarget =
+      components.State[eid] === PuckStates.Engaged
+        ? components.TargetEid[eid]!
+        : -1
 
     let closingOnEnemy = false
 
@@ -58,22 +56,17 @@ export function stepMovement(
       if (dist <= 0) continue
 
       const otherTeam = components.Team[other]!
-      const otherType = typeIdOf(world, other)
-      const preysOnOther =
-        otherTeam !== selfTeam &&
-        (damage[selfType]?.[otherType] ?? 0) >
-          (damage[otherType]?.[selfType] ?? 0)
+      const selfTeam = components.Team[eid]!
 
-      // Toward-other unit (from self to other) is (-dx/dist, -dy/dist).
       if (otherTeam !== selfTeam && (ix !== 0 || iy !== 0)) {
         const towardDot = (-dx / dist) * ix + (-dy / dist) * iy
-        if (towardDot > 0.5 && dist < tuning.threatRadius) {
+        if (towardDot > 0.5 && dist < tuning.threatEnterRadius) {
           closingOnEnemy = true
         }
       }
 
-      // Separation: skip prey we are allowed/meant to touch.
-      if (preysOnOther) continue
+      // Separation: exempt the Engaged target only.
+      if (other === engagedTarget) continue
       if (dist < separationRadius) {
         const strength = (separationRadius - dist) / separationRadius
         fx += (dx / dist) * strength * weights.separation

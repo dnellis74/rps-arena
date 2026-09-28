@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createV0Behavior } from '../src/behavior/v0.ts'
 import {
   createMatch,
   loadGameData,
@@ -9,19 +8,12 @@ import {
 import { killPuck } from '../src/sim/world.ts'
 
 const data = loadGameData()
-const behavior = createV0Behavior({
-  types: data.types,
-  damage: data.damage,
-  tuning: data.tuning,
-})
-
 describe('hit cooldown', () => {
   it('enforces per-attacker cooldown between damage hits', () => {
     const match = createMatch({
       ...data,
       mode: 'damage',
       seed: 7,
-      behavior,
       roster: {
         a: { rock: 1, paper: 1, scissors: 0 },
         b: { rock: 1, paper: 1, scissors: 0 },

@@ -1,4 +1,5 @@
 import { createWorld, addEntity, removeEntity, addComponent, query } from 'bitecs'
+import { PuckStates } from './types.ts'
 import type { CombatMode, TeamId, TypeId, TypesData, TuningData } from './types.ts'
 
 export type Components = {
@@ -12,6 +13,31 @@ export type Components = {
   TypeIndex: Int16Array
   HitCooldown: Float32Array
   Alive: Uint8Array
+  /** PuckStates value. */
+  State: Int8Array
+  TimeInState: Float32Array
+  /** Engaged target eid, or -1. */
+  TargetEid: Int32Array
+  /** Seconds remaining before Engaged is allowed (except gang-up). */
+  ReengageLockout: Float32Array
+  /** Seconds remaining before another state change is allowed. */
+  StateChangeCooldown: Float32Array
+  /**
+   * Team lead from this puck's view: -1 behind, 0 unset/even, 1 ahead.
+   * Updated with hysteresis.
+   */
+  TeamLead: Int8Array
+}
+
+export type StateMetrics = {
+  /** Cumulative seconds spent in each state across all live pucks. */
+  timeInState: [number, number, number, number]
+  /** Number of state transitions. */
+  changes: number
+  /** Integral of live puck count over time (puck-seconds). */
+  puckSeconds: number
+  /** Named transition counts for batch reporting. */
+  transitions: Record<string, number>
 }
 
 export type SimWorld = {
@@ -26,6 +52,7 @@ export type SimWorld = {
   finished: boolean
   winner: TeamId | null
   reason: 'elimination' | 'stalemate' | null
+  stateMetrics: StateMetrics
 }
 
 /** Entity storage sized for the match (both sides + spare). */
@@ -51,6 +78,12 @@ export function createSimWorld(
       TypeIndex: new Int16Array(cap),
       HitCooldown: new Float32Array(cap),
       Alive: new Uint8Array(cap),
+      State: new Int8Array(cap),
+      TimeInState: new Float32Array(cap),
+      TargetEid: new Int32Array(cap),
+      ReengageLockout: new Float32Array(cap),
+      StateChangeCooldown: new Float32Array(cap),
+      TeamLead: new Int8Array(cap),
     },
     typeIds,
     typeIndex,
@@ -62,6 +95,12 @@ export function createSimWorld(
     finished: false,
     winner: null as TeamId | null,
     reason: null as 'elimination' | 'stalemate' | null,
+    stateMetrics: {
+      timeInState: [0, 0, 0, 0],
+      changes: 0,
+      puckSeconds: 0,
+      transitions: {},
+    },
   }) as unknown as ReturnType<typeof createWorld> & SimWorld
 
   return world as unknown as SimWorld & ReturnType<typeof createWorld>
@@ -94,6 +133,12 @@ export function spawnPuck(
   addComponent(world, eid, components.TypeIndex)
   addComponent(world, eid, components.HitCooldown)
   addComponent(world, eid, components.Alive)
+  addComponent(world, eid, components.State)
+  addComponent(world, eid, components.TimeInState)
+  addComponent(world, eid, components.TargetEid)
+  addComponent(world, eid, components.ReengageLockout)
+  addComponent(world, eid, components.StateChangeCooldown)
+  addComponent(world, eid, components.TeamLead)
 
   components.Position.x[eid] = opts.x
   components.Position.y[eid] = opts.y
@@ -107,6 +152,12 @@ export function spawnPuck(
   components.TypeIndex[eid] = ti
   components.HitCooldown[eid] = 0
   components.Alive[eid] = 1
+  components.State[eid] = PuckStates.Hunting
+  components.TimeInState[eid] = 0
+  components.TargetEid[eid] = -1
+  components.ReengageLockout[eid] = 0
+  components.StateChangeCooldown[eid] = 0
+  components.TeamLead[eid] = 0
   return eid
 }
 
@@ -124,4 +175,9 @@ export function aliveEntities(world: EcsWorld): number[] {
 
 export function typeIdOf(world: SimWorld, eid: number): TypeId {
   return world.typeIds[world.components.TypeIndex[eid]!]!
+}
+
+export function recordTransition(world: SimWorld, name: string): void {
+  world.stateMetrics.transitions[name] =
+    (world.stateMetrics.transitions[name] ?? 0) + 1
 }

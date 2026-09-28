@@ -143,6 +143,51 @@ body {
   grid-column: span 2;
 }
 
+.state-legend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 2px 2px 0;
+}
+
+.state-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.state-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.state-legend .leg-hunt {
+  border: 1.5px solid rgba(200, 210, 230, 0.7);
+  background: transparent;
+}
+
+.state-legend .leg-eng {
+  border: none;
+  background: var(--team-a);
+}
+
+.state-legend .leg-ret {
+  border: none;
+  background: #f0c040;
+}
+
+.state-legend .leg-reg {
+  border: 2px solid #9ec0ff;
+  background: transparent;
+}
+
 .end-screen {
   position: absolute;
   inset: 0;

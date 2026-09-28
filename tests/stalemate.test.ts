@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createV0Behavior } from '../src/behavior/v0.ts'
 import {
   createMatch,
   getMatchResult,
@@ -9,12 +8,6 @@ import {
 } from '../src/sim/index.ts'
 
 const data = loadGameData()
-const behavior = createV0Behavior({
-  types: data.types,
-  damage: data.damage,
-  tuning: data.tuning,
-})
-
 describe('stalemate timer', () => {
   it('ends the match after stalemateTimeout with no hits', () => {
     // Only rocks vs rocks: force no hits by freezing in place.
@@ -22,7 +15,6 @@ describe('stalemate timer', () => {
       ...data,
       mode: 'damage',
       seed: 99,
-      behavior,
       roster: {
         a: { rock: 2, paper: 0, scissors: 0 },
         b: { rock: 2, paper: 0, scissors: 0 },

@@ -2,15 +2,17 @@ import { resolveContacts } from './combat.ts'
 import { stepMovement } from './movement.ts'
 import { SeededRng } from './rng.ts'
 import { expandRoster, rosterSideCount, spawnTeam } from './spawn.ts'
-import type {
-  BehaviorFn,
-  CombatMode,
-  DamageMatrix,
-  MatchResult,
-  RosterData,
-  TeamId,
-  TuningData,
-  TypesData,
+import {
+  PUCK_STATE_NAMES,
+  type CombatMode,
+  type DamageMatrix,
+  type MatchResult,
+  type PuckStateId,
+  type PuckStateName,
+  type RosterData,
+  type TeamId,
+  type TuningData,
+  type TypesData,
 } from './types.ts'
 import {
   aliveEntities,
@@ -22,7 +24,6 @@ import {
 export type Match = {
   world: EcsWorld
   damage: DamageMatrix
-  behavior: BehaviorFn
   seed: number
   mode: CombatMode
   rng: SeededRng
@@ -35,10 +36,8 @@ export function createMatch(opts: {
   tuning: TuningData
   mode: CombatMode
   seed: number
-  behavior: BehaviorFn
 }): Match {
   const rng = new SeededRng(opts.seed)
-  // Capacity from roster data only: both sides + spare for convert churn.
   const countA = rosterSideCount(opts.roster.a)
   const countB = rosterSideCount(opts.roster.b)
   const world = createSimWorld(
@@ -54,7 +53,6 @@ export function createMatch(opts: {
   return {
     world,
     damage: opts.damage,
-    behavior: opts.behavior,
     seed: opts.seed,
     mode: opts.mode,
     rng,
@@ -63,7 +61,7 @@ export function createMatch(opts: {
 
 /** One fixed-timestep simulation step. */
 export function stepMatch(match: Match): void {
-  const { world, damage, behavior } = match
+  const { world, damage } = match
   if (world.finished) return
 
   const dt = world.tuning.fixedDt
@@ -76,7 +74,7 @@ export function stepMatch(match: Match): void {
     }
   }
 
-  stepMovement(world, damage, behavior, dt)
+  stepMovement(world, damage, dt)
   const hit = resolveContacts(world, damage)
 
   world.elapsed += dt
@@ -112,6 +110,26 @@ export function countTeams(world: EcsWorld): { a: number; b: number } {
   for (const eid of aliveEntities(world)) {
     if (world.components.Team[eid] === 0) a++
     else b++
+  }
+  return { a, b }
+}
+
+export function countStatesByTeam(world: EcsWorld): {
+  a: Record<PuckStateName, number>
+  b: Record<PuckStateName, number>
+} {
+  const empty = (): Record<PuckStateName, number> => ({
+    Hunting: 0,
+    Engaged: 0,
+    Retreating: 0,
+    Regrouping: 0,
+  })
+  const a = empty()
+  const b = empty()
+  for (const eid of aliveEntities(world)) {
+    const name = PUCK_STATE_NAMES[world.components.State[eid]! as PuckStateId]!
+    if (world.components.Team[eid] === 0) a[name]++
+    else b[name]++
   }
   return { a, b }
 }
@@ -152,7 +170,6 @@ export function runHeadless(match: Match, maxSteps = 100_000): MatchResult {
     steps++
   }
   if (!match.world.finished) {
-    // Safety: force stalemate by HP if we hit the cap.
     match.world.finished = true
     match.world.reason = 'stalemate'
     const hp = totalHp(match.world)
@@ -176,6 +193,10 @@ export type PuckSnapshot = {
   glyph: string
   vx: number
   vy: number
+  state: PuckStateId
+  stateName: PuckStateName
+  timeInState: number
+  targetId: number | null
 }
 
 export function snapshotPucks(match: Match): PuckSnapshot[] {
@@ -183,6 +204,8 @@ export function snapshotPucks(match: Match): PuckSnapshot[] {
   const out: PuckSnapshot[] = []
   for (const eid of aliveEntities(world)) {
     const type = world.typeIds[world.components.TypeIndex[eid]!]!
+    const state = world.components.State[eid]! as PuckStateId
+    const target = world.components.TargetEid[eid]!
     out.push({
       id: eid,
       x: world.components.Position.x[eid]!,
@@ -195,6 +218,10 @@ export function snapshotPucks(match: Match): PuckSnapshot[] {
       glyph: world.types[type]!.glyph,
       vx: world.components.Velocity.x[eid]!,
       vy: world.components.Velocity.y[eid]!,
+      state,
+      stateName: PUCK_STATE_NAMES[state]!,
+      timeInState: world.components.TimeInState[eid]!,
+      targetId: target >= 0 ? target : null,
     })
   }
   return out

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createV0Behavior } from '../src/behavior/v0.ts'
 import {
   countTeams,
   createMatch,
@@ -9,12 +8,6 @@ import {
 } from '../src/sim/index.ts'
 
 const data = loadGameData()
-const behavior = createV0Behavior({
-  types: data.types,
-  damage: data.damage,
-  tuning: data.tuning,
-})
-
 function talliesFor(
   match: ReturnType<typeof createMatch>,
   team: 0 | 1,
@@ -43,7 +36,6 @@ describe('data-driven roster', () => {
       ...data,
       mode: 'damage',
       seed: 1,
-      behavior,
     })
     const counts = countTeams(match.world)
     expect(counts.a).toBe(rosterSideCount(data.roster.a))
@@ -60,7 +52,6 @@ describe('data-driven roster', () => {
       roster,
       mode: 'damage',
       seed: 2,
-      behavior,
     })
     expect(countTeams(match.world)).toEqual({
       a: rosterSideCount(roster.a),
@@ -80,7 +71,6 @@ describe('data-driven roster', () => {
       roster,
       mode: 'damage',
       seed: 3,
-      behavior,
     })
     expect(countTeams(match.world)).toEqual({ a: 6, b: 5 })
     expect(talliesFor(match, 0)).toEqual({ rock: 5, scissors: 1 })

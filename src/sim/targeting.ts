@@ -21,6 +21,7 @@ export function nearestCounterAlly(
 /**
  * Targeting link: given the nearest predator (any range), the nearest ally that
  * preys on that predator's type. Null if no predator or no such ally.
+ * This is the offensive support link.
  */
 export function counterAllyLink(
   obs: Observation,
@@ -31,4 +32,52 @@ export function counterAllyLink(
   const ally = nearestCounterAlly(obs, predator.type, damage)
   if (!ally) return null
   return { predator, ally }
+}
+
+/**
+ * True when `selfType` preys on some type that preys on `allyType`.
+ * Example: scissors defends rock, because scissors preys on paper and paper
+ * preys on rock.
+ */
+export function canDefend(
+  damage: DamageMatrix,
+  selfType: TypeId,
+  allyType: TypeId,
+): boolean {
+  for (const enemyType of Object.keys(damage)) {
+    if (!derivesPrey(damage, selfType, enemyType)) continue
+    if (derivesPrey(damage, enemyType, allyType)) return true
+  }
+  return false
+}
+
+/** Nearest teammate this puck can defend. Null if none. */
+export function nearestDefendAlly(
+  obs: Observation,
+  damage: DamageMatrix,
+): SeenEntity | null {
+  let best: SeenEntity | null = null
+  for (const mate of obs.teammates) {
+    if (!canDefend(damage, obs.type, mate.type)) continue
+    if (!best || mate.dist < best.dist) best = mate
+  }
+  return best
+}
+
+/**
+ * Ally to steer toward. When `losing`, the defensive link wins over the
+ * offensive one. If the preferred link is missing, use the other.
+ */
+export function supportAlly(
+  obs: Observation,
+  damage: DamageMatrix,
+  losing: boolean,
+): SeenEntity | null {
+  const predator = obs.predators[0]
+  const offensive = predator
+    ? nearestCounterAlly(obs, predator.type, damage)
+    : null
+  const defensive = nearestDefendAlly(obs, damage)
+  if (losing) return defensive ?? offensive
+  return offensive ?? defensive
 }

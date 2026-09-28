@@ -75,25 +75,101 @@ Team colors: Team A blue fill, Team B orange fill, white glyph.
 - Prey: an enemy this puck preys on.
 - Predator: an enemy that preys on this puck.
 - Same-tier enemy: neither preys on the other (same type in v0).
-- Counter ally: the nearest teammate that preys on this puck's current
-  predator's type (derived from the damage matrix). Example: scissors whose
-  nearest predator is rock links to the nearest allied paper (paper preys on
-  rock). No shared memory — each puck picks the link from its own observation.
+- Valid same-tier engage: a same-tier enemy where own HP is above the top of
+  that enemy's seen band.
+- Counter ally (offensive): the nearest teammate that preys on this puck's
+  current predator's type (derived from the damage matrix). Example: scissors
+  whose nearest predator is rock links to the nearest allied paper (paper
+  preys on rock).
+- Defend ally (defensive): the nearest teammate preyed on by a type this puck
+  preys on. Example: scissors defends rock, because scissors preys on paper
+  and paper preys on rock (scissors can kill the paper chasing that rock).
+- Support ally: the ally steering uses. When this side is behind on seen HP,
+  the defensive link wins. Otherwise the offensive link wins. If the preferred
+  link is missing, use the other. Ahead/behind uses hysteresis
+  (`teamLeadHysteresis`): the lead flag flips only when the seen-HP difference
+  exceeds that margin. No shared memory — each puck picks both links from its
+  own observation.
+- Finish prey: nearest prey distance is at most predator distance times
+  `attackOverFlee`. Favors finishing a close kill over fleeing a farther
+  predator.
+- Gang-up condition: for the nearest predator within `threatEnterRadius`, if
+  enough friendly pucks that this predator preys on (self included) are within
+  `gangUpRadius` of it, the count meets the gang-up threshold (see below).
+  When this side is ahead, the required count is lowered by one (minimum 1).
 
-### Intent, in priority order
+### State machine
 
-1. **Gang-up.** For the nearest predator within the threat radius (start 6
-   units): if enough friendly pucks that this predator preys on, self
-   included, are within the gang-up radius (start 3 units) of it, engage it.
-   The required count is the gang-up threshold (see below).
-2. **Flee.** Otherwise, move away from the nearest predator within the threat
-   radius. Weight rises sharply as it gets closer. Flee intent is biased toward
-   the counter ally when one exists (`counterAllyBias` in `data/tuning.json`).
-3. **Seek.** Move toward the nearest prey. If a predator is still in threat
-   range but Seek won via attack-over-flee, apply a lighter counter-ally bias.
-4. **Same-tier fight.** Engage a same-tier enemy only with an HP advantage:
-   own HP is above the top of the enemy's seen band. Otherwise keep clear.
-5. **Idle.** Nothing to do: hold near teammates.
+Each puck is always in exactly one state. The state persists between ticks and
+has a time-in-state counter. All pucks use identical parameters from
+`data/tuning.json` (no per-puck variation). Initial state is Hunting.
+
+**Hunting**: move toward nearest prey. If none, move toward support ally,
+else drift toward nearby teammates.
+
+**Engaged**: committed to one target (prey, a gang-up predator, or a valid
+same-tier enemy). Move toward that target only.
+
+**Retreating**: flee the nearest predator, harder the closer it is, with a
+pull toward the support ally (`counterAllyBias`).
+
+**Regrouping**: move toward whichever is closer: the nearest ally or the
+nearest prey.
+
+#### Transitions
+
+Checked every sim step, in the order listed per state.
+
+From any state:
+- Gang-up condition met → Engaged, target = that predator.
+
+Hunting:
+- Predator within `threatEnterRadius` → Retreating, unless finish prey
+  applies, then → Engaged with that prey.
+- Prey or valid same-tier enemy within `engageRadius` → Engaged.
+
+Engaged:
+- Target dies or is otherwise invalid (dead, same team, or gone) → Regrouping.
+- Own HP is at or below `retreatHpFraction` of own max HP → Retreating.
+- Time in state exceeds `engageMaxTime` → Regrouping.
+- A predator (not the target) enters `threatEnterRadius` and finish prey no
+  longer applies → Retreating.
+
+Retreating:
+- Within `supportAllyRadius` of the support ally → Regrouping.
+- Nearest predator beyond `threatExitRadius` (or no predators) → Regrouping.
+
+Regrouping:
+- Predator within `threatEnterRadius` → Retreating.
+- Re-engage lockout expired and prey within `engageRadius` → Engaged.
+- Time in state exceeds `regroupMaxTime` → Hunting.
+
+Re-engage lockout: after leaving Retreating, the puck cannot enter Engaged,
+except via gang-up, for `reengageLockout` seconds.
+
+State change rate: a puck may change state at most
+`maxStateChangesPerSecond` times per second (default 2). After a state change,
+further state changes are blocked until `1 / maxStateChangesPerSecond`
+seconds have elapsed. Retargeting within the same state (for example Engaged
+switching targets) does not count as a state change.
+
+#### New tuning parameters (defaults)
+
+| Parameter | Default |
+|---|---|
+| engageRadius | 2.0 |
+| engageMaxTime | 4.0 s |
+| threatEnterRadius | 6.0 |
+| threatExitRadius | 7.0 |
+| supportAllyRadius | 1.5 |
+| reengageLockout | 1.5 s |
+| regroupMaxTime | 3.0 s |
+| retreatHpFraction | 1/3 |
+| teamLeadHysteresis | 10% of total max HP on both sides' seen HP |
+| maxStateChangesPerSecond | 2 |
+
+`threatEnterRadius` replaces the old single `threatRadius` for enter checks.
+`attackOverFlee`, `counterAllyBias`, and `gangUpRadius` remain.
 
 ### Gang-up threshold
 
@@ -109,6 +185,8 @@ this estimate is good enough.
 The chosen intent gives a direction. Add:
 
 - Separation: away from any puck within 1.2 units, teammates included.
+  Separation exempts the puck's current Engaged target (any type), not all
+  prey in general.
 - Walls: push away from walls within 2.5 units. Required, or fleeing pucks
   pin themselves in corners.
 
@@ -116,13 +194,29 @@ Sum the weighted terms, normalize, move at the puck's speed.
 
 ### Behavior interface
 
-This signature must be kept. Later behaviors plug in here.
+This signature must be kept. Later behaviors plug in here. v0 intent comes
+from the state machine in the sim; the machine reads observation and persisted
+puck state, then returns a desired direction.
 
     behavior(observation) -> desired direction
 
     observation: own type, team, position, exact HP, and lists of prey,
     predators, same-tier enemies, and teammates, each with relative position
     and seen HP band
+
+### Visible state
+
+- Each puck shows its state as a small square at the base of its HP bar:
+  - Hunting: empty (stroke only)
+  - Engaged: solid fill in team color
+  - Retreating: solid amber fill
+  - Regrouping: hollow thick-border square
+- Must be readable on a phone at the zoom-out limit. If it is not, increase
+  marker size slightly, not puck size.
+- A small legend for the four styles in the UI panel.
+- Tapped puck: show state name, time in state, current target, and lines to
+  target and support ally.
+- Status line: count of pucks in each state per side.
 
 ## 5. Combat
 
@@ -150,11 +244,16 @@ Combat mode is a match setting:
 ## 7. UI
 
 - Spectator only in v0.
-- Tap a puck: show type, team, HP, and lines to its current prey (green),
-  predator (red), and counter ally (cyan) when those exist.
+- Tap a puck: show type, team, HP, state name, time in state, current target,
+  and lines to its Engaged target (when any) and support ally. Prey (green),
+  predator (red), counter ally (cyan), and defend ally (violet) lines remain
+  when those exist.
+- State marker legend in the UI panel (Hunting empty, Engaged solid team,
+  Retreating amber, Regrouping hollow).
 - Controls: pause (button or Space), 1x, 4x, restart with same seed, restart with new seed,
   combat mode selector.
-- Status line: seed, elapsed time, pucks remaining per side.
+- Status line: seed, elapsed time, pucks remaining per side, and count of
+  pucks in each state per side.
 - End screen: winner, time, survivors, reason (elimination or stalemate).
 - Tap targets at least 44px. No layout breakage at 390px width.
 
@@ -217,9 +316,13 @@ Tests (headless, camera math only):
 - HP band perception at band edges.
 - Hit cooldown.
 - Stalemate timer.
+- State machine: each transition above with a constructed scenario; re-engage
+  lockout blocks Engaged but not gang-up; Engaged ends on target death, low
+  HP, and timeout; separation does not push away from the Engaged target.
 - Batch: 100 headless matches per combat mode, reporting win rate per side,
-  draw rate, stalemate rate, and mean match length. With symmetric data, side
-  win rates should be close to even.
+  draw rate, stalemate rate, mean match length, state changes per puck per
+  minute, and time share in each state. With symmetric data, side win rates
+  should be close to even.
 
 Do not automate UI testing. A person checks it on a phone.
 

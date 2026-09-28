@@ -1,6 +1,6 @@
 import './style.css'
-import { createV0Behavior } from './behavior/v0.ts'
 import {
+  countStatesByTeam,
   countTeams,
   createMatch,
   getMatchResult,
@@ -26,11 +26,6 @@ import {
 import { drawFrame, hitTestPuck, modeLabel } from './render/draw.ts'
 
 const data = loadGameData()
-const behavior = createV0Behavior({
-  types: data.types,
-  damage: data.damage,
-  tuning: data.tuning,
-})
 
 const PUCK_DIAMETER = 2 * data.types.rock!.radius
 const TAP_SLOP_PX = 10
@@ -83,6 +78,12 @@ app.innerHTML = `
       <option value="instant_kill">Instant kill</option>
       <option value="convert">Convert</option>
     </select>
+    <div class="state-legend" aria-label="State marker legend">
+      <span><i class="leg-hunt"></i>Hunt</span>
+      <span><i class="leg-eng"></i>Engage</span>
+      <span><i class="leg-ret"></i>Retreat</span>
+      <span><i class="leg-reg"></i>Regroup</span>
+    </div>
   </div>
 `
 
@@ -119,7 +120,6 @@ function makeMatch(s: number, m: CombatMode): Match {
     tuning: data.tuning,
     mode: m,
     seed: s,
-    behavior,
   })
 }
 
@@ -344,8 +344,11 @@ function formatTime(t: number): string {
 
 function updateStatus(): void {
   const counts = countTeams(match.world)
+  const states = countStatesByTeam(match.world)
   const noHit = match.world.timeSinceHit
   const timeout = data.tuning.stalemateTimeout
+  const fmt = (s: typeof states.a) =>
+    `H${s.Hunting} E${s.Engaged} R${s.Retreating} G${s.Regrouping}`
   statusEl.innerHTML = `
     seed <strong>${seed}</strong>
     · ${formatTime(match.world.elapsed)}
@@ -353,6 +356,9 @@ function updateStatus(): void {
     / <span class="team-b">B ${counts.b}</span>
     · no-hit ${noHit.toFixed(1)}/${timeout}s
     · ${modeLabel(mode)}
+    <br />
+    <span class="team-a">A ${fmt(states.a)}</span>
+    · <span class="team-b">B ${fmt(states.b)}</span>
   `
 }
 
@@ -367,10 +373,21 @@ function updateInspect(): void {
     selectedId = null
     return
   }
+  const target =
+    p.targetId !== null
+      ? snapshotPucks(match).find((x) => x.id === p.targetId)
+      : null
+  const targetText = target
+    ? `${target.glyph} #${target.id}`
+    : p.targetId !== null
+      ? `#${p.targetId}`
+      : 'none'
   inspectEl.innerHTML = `
     <div><strong>${p.glyph}</strong> ${p.type}</div>
     <div>Team ${p.team === 0 ? 'A' : 'B'}</div>
     <div>HP ${p.hp.toFixed(1)} / ${p.maxHp}</div>
+    <div>State ${p.stateName} (${p.timeInState.toFixed(1)}s)</div>
+    <div>Target ${targetText}</div>
   `
 }
 

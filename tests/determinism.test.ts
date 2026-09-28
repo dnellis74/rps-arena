@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { createV0Behavior } from '../src/behavior/v0.ts'
 import {
   createMatch,
   loadGameData,
@@ -8,12 +7,6 @@ import {
 import type { CombatMode, MatchResult } from '../src/sim/index.ts'
 
 const data = loadGameData()
-const behavior = createV0Behavior({
-  types: data.types,
-  damage: data.damage,
-  tuning: data.tuning,
-})
-
 function fingerprint(result: MatchResult): string {
   return [
     result.winner,
@@ -26,12 +19,18 @@ function fingerprint(result: MatchResult): string {
   ].join('|')
 }
 
+/** Small fixed roster so the check stays fast regardless of playtest counts. */
+const roster = {
+  a: { rock: 3, paper: 3, scissors: 3 },
+  b: { rock: 3, paper: 3, scissors: 3 },
+}
+
 function runOnce(seed: number, mode: CombatMode): MatchResult {
   const match = createMatch({
     ...data,
+    roster,
     mode,
     seed,
-    behavior,
   })
   return runHeadless(match)
 }
