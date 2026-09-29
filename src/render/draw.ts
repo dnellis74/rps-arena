@@ -25,6 +25,7 @@ export function drawFrame(
   pucks: PuckSnapshot[],
   cam: Camera,
   selectedId: number | null,
+  dpr: number,
 ): void {
   const { tuning } = match.world
   const { arenaWidth: W, arenaHeight: H } = tuning
@@ -111,42 +112,78 @@ export function drawFrame(
     const c = worldToScreen(cam, p.x, p.y)
     const r = p.radius * cam.scale
 
-    ctx.beginPath()
-    ctx.arc(c.x, c.y, r, 0, Math.PI * 2)
+    tracePuckBody(ctx, c.x, c.y, r, p.shape, p.team)
     ctx.fillStyle = TEAM_FILL[p.team]
     ctx.fill()
 
     if (selectedId === p.id) {
       ctx.setLineDash([])
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 2.5
+      ctx.lineWidth = 2.5 * dpr
       ctx.beginPath()
-      ctx.arc(c.x, c.y, r + 3, 0, Math.PI * 2)
+      ctx.arc(c.x, c.y, r * BODY_EXTENT + 2 * dpr, 0, Math.PI * 2)
       ctx.stroke()
     }
 
     ctx.fillStyle = '#ffffff'
-    ctx.font = `bold ${Math.max(10, r * 1.2)}px "IBM Plex Mono", ui-monospace, monospace`
+    ctx.font = `bold ${r * 1.2}px "IBM Plex Mono", ui-monospace, monospace`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(p.glyph, c.x, c.y + 0.5)
+    ctx.fillText(p.glyph, c.x, c.y)
+
+    // Below 16 CSS px across, a marker cannot stay legible at the zoom-out size.
+    const diameterCss = (r * 2) / dpr
+    if (diameterCss < MARK_MIN_DIAMETER_CSS) continue
 
     const barW = r * 2
-    const barH = 3
+    const barH = 3 * dpr
     const barX = c.x - r
-    const barY = c.y + r + 2
+    const barY = c.y + r * BODY_EXTENT + 2 * dpr
     const hpFrac = p.hp / p.maxHp
     ctx.fillStyle = 'rgba(0,0,0,0.35)'
     ctx.fillRect(barX, barY, barW, barH)
     ctx.fillStyle = hpFrac > 0.34 ? '#9fe870' : '#f0c040'
     ctx.fillRect(barX, barY, barW * hpFrac, barH)
 
-    // State marker: small square at the base of the HP bar.
-    const mark = Math.max(4, Math.min(7, barH + 2))
-    drawStateMark(ctx, barX - mark - 1, barY + (barH - mark) / 2, mark, p)
+    const mark = Math.max(4 * dpr, Math.min(7 * dpr, barH + 2 * dpr))
+    drawStateMark(ctx, barX - mark - dpr, barY + (barH - mark) / 2, mark, p, dpr)
   }
 
   drawMinimap(ctx, cam, pucks)
+}
+
+/** Distance from center to the equal-area triangle tip, in radii. */
+const BODY_EXTENT = 2 * Math.sqrt(Math.PI / (3 * Math.sqrt(3)))
+/** Hide HP bar and state marker when the puck is smaller than this, in CSS px. */
+const MARK_MIN_DIAMETER_CSS = 16
+
+function tracePuckBody(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  shape: string,
+  team: TeamId,
+): void {
+  ctx.beginPath()
+  if (shape === 'square') {
+    const side = r * Math.sqrt(Math.PI)
+    ctx.rect(x - side / 2, y - side / 2, side, side)
+    return
+  }
+  if (shape === 'triangle') {
+    const side = 2 * r * Math.sqrt(Math.PI / Math.sqrt(3))
+    const height = (Math.sqrt(3) / 2) * side
+    const tip = (2 / 3) * height
+    const base = height / 3
+    const dir = team === 0 ? -1 : 1
+    ctx.moveTo(x, y + dir * tip)
+    ctx.lineTo(x - side / 2, y - dir * base)
+    ctx.lineTo(x + side / 2, y - dir * base)
+    ctx.closePath()
+    return
+  }
+  ctx.arc(x, y, r, 0, Math.PI * 2)
 }
 
 function drawStateMark(
@@ -155,13 +192,13 @@ function drawStateMark(
   y: number,
   size: number,
   p: PuckSnapshot,
+  dpr: number,
 ): void {
   ctx.setLineDash([])
-  ctx.lineWidth = 1.25
+  ctx.lineWidth = 1.25 * dpr
   if (p.state === PuckStates.Hunting) {
-    // Empty square — hunting has no fill.
     ctx.strokeStyle = 'rgba(200, 210, 230, 0.55)'
-    ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1)
+    ctx.strokeRect(x + 0.5 * dpr, y + 0.5 * dpr, size - dpr, size - dpr)
     return
   }
   if (p.state === PuckStates.Engaged) {
@@ -181,8 +218,8 @@ function drawStateMark(
   }
   // Regrouping: hollow square with thick border.
   ctx.strokeStyle = '#9ec0ff'
-  ctx.lineWidth = 2
-  ctx.strokeRect(x + 1, y + 1, size - 2, size - 2)
+  ctx.lineWidth = 2 * dpr
+  ctx.strokeRect(x + dpr, y + dpr, size - 2 * dpr, size - 2 * dpr)
 }
 
 function drawSpawnZones(

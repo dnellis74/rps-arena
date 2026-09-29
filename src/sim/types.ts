@@ -1,7 +1,16 @@
 export type TypeId = string
 
+/** Body shape drawn for this type. Unknown values are drawn as a circle. */
+export type PuckShape = 'circle' | 'square' | 'triangle'
+
+export function puckShape(raw: string | undefined): PuckShape {
+  if (raw === 'circle' || raw === 'square' || raw === 'triangle') return raw
+  return 'circle'
+}
+
 export type TypeDef = {
   glyph: string
+  shape: PuckShape
   hp: number
   speed: number
   radius: number

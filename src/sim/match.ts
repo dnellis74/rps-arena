@@ -6,9 +6,11 @@ import { overlapsSpawnZone, spawnPosition } from './spawn.ts'
 import {
   PUCK_STATE_NAMES,
   PuckStates,
+  puckShape,
   type CombatMode,
   type DamageMatrix,
   type MatchResult,
+  type PuckShape,
   type PuckStateId,
   type PuckStateName,
   type SpawnInput,
@@ -285,6 +287,7 @@ export type PuckSnapshot = {
   team: TeamId
   type: string
   glyph: string
+  shape: PuckShape
   vx: number
   vy: number
   state: PuckStateId
@@ -310,6 +313,7 @@ export function snapshotPucks(match: Match): PuckSnapshot[] {
       team: world.components.Team[eid] as TeamId,
       type,
       glyph: world.types[type]!.glyph,
+      shape: puckShape(world.types[type]?.shape),
       vx: world.components.Velocity.x[eid]!,
       vy: world.components.Velocity.y[eid]!,
       state,

@@ -21,6 +21,7 @@ export {
   recordedInputs,
 } from './match.ts'
 export type { Match, PuckSnapshot } from './match.ts'
+export { puckShape } from './types.ts'
 export { loadGameData } from './data.ts'
 export { buildObservation } from './perception.ts'
 export { spawnZoneCenter, enemySpawnZoneCenter, overlapsSpawnZone } from './spawn.ts'
@@ -48,6 +49,7 @@ export type {
   SimConfig,
   PuckStateId,
   PuckStateName,
+  PuckShape,
   SpawnInput,
 } from './types.ts'
 export { PuckStates, PUCK_STATE_NAMES } from './types.ts'

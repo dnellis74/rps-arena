@@ -2,7 +2,8 @@
 
 Rock-paper-scissors team fights. The field starts empty. Each side
 earns charges and spends them to spawn units (Team A by the player, Team B by
-a random opponent). Type stats and damage live in `data/types.json`.
+a random opponent). A unit's body is its type shape: rock a circle, paper a
+square, scissors a triangle. Type stats and damage live in `data/types.json`.
 
 ## Requirements
 

@@ -222,6 +222,28 @@ body {
   background: #ffffff;
 }
 
+.state-legend .leg-circle {
+  border: none;
+  border-radius: 50%;
+  background: #c5d0e4;
+}
+
+.state-legend .leg-square {
+  border: none;
+  border-radius: 1px;
+  background: #c5d0e4;
+}
+
+.state-legend .leg-tri {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid #c5d0e4;
+  background: none;
+}
+
 .spawn-bar {
   display: flex;
   flex-direction: column;

@@ -36,11 +36,11 @@ v0 values are symmetric. Asymmetric types are on the roadmap.
 live in the same object. `loadGameData()` splits them into type stats and the
 damage matrix.
 
-| Type | Glyph | HP | Speed | Radius | HP band size | Convert HP | vs rock | vs paper | vs scissors |
-|---|---|---|---|---|---|---|---|---|---|
-| rock | R | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 2 | 1 | 3 |
-| paper | P | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 3 | 2 | 1 |
-| scissors | S | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 1 | 3 | 2 |
+| Type | Glyph | Shape | HP | Speed | Radius | HP band size | Convert HP | vs rock | vs paper | vs scissors |
+|---|---|---|---|---|---|---|---|---|---|---|
+| rock | R | circle | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 2 | 1 | 3 |
+| paper | P | square | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 3 | 2 | 1 |
+| scissors | S | triangle | 12 | 4.0 | 0.5 | 1/3 | 1/2 | 1 | 3 | 2 |
 
 - HP band size: how precisely this type reads an enemy's HP, as a fraction of
   the enemy's max HP. 1/3 gives three bands (high, mid, low).
@@ -56,7 +56,8 @@ damage matrix.
 `data/tuning.json`: steering, combat, spawn zones, charge rate, and the
 state-machine parameters below. There is no roster file.
 
-Team colors: Team A blue fill, Team B orange fill, white glyph.
+Team colors: Team A blue fill, Team B orange fill, white glyph. A missing
+or unknown `shape` is drawn as a circle.
 
 ## 4. Behavior (v0, hand-written)
 
@@ -220,15 +221,28 @@ puck state, then returns a desired direction.
 
 ### Visible state
 
-- Each puck shows its state as a small square at the base of its HP bar:
+- The puck body is its type shape, filled with the team color: circle, square,
+  or equilateral triangle. The three shapes are scaled to about the same filled
+  area, not the same circumradius. The triangle points toward the enemy spawn
+  zone: up for Team A, down for Team B. A missing or unknown shape is a circle.
+- The glyph is always drawn, in white, at 1.2 times the collision radius in
+  device pixels. Shape and team color still identify the type when the letter
+  is small.
+- Each puck shows its state as a square at the base of its HP bar:
   - Hunting: empty (stroke only)
   - Engaged: solid fill in team color
   - Retreating: solid amber fill
   - Regrouping: hollow thick-border square
   - Advancing: white square
-- Must be readable on a phone at the zoom-out limit. If it is not, increase
-  marker size slightly, not puck size.
-- A small legend for the five styles in the UI panel.
+- HP bar height, state-marker size (clamped between 4 and 7 CSS px), and
+  selection-ring width are CSS pixels times the device pixel ratio. At the
+  zoom-out limit a puck is about 8 CSS px across, and a marker that small
+  cannot be read. The HP bar and state marker are hidden when the puck's
+  on-screen diameter is below 16 CSS px. Shape and team color stay visible.
+  Do not shrink the marker below 4 CSS px to force it onto a smaller puck.
+- The selection ring is a circle around the shape, the same circle for every
+  type. Minimap marks stay dots.
+- A small legend for the five state styles and the three shapes in the UI panel.
 - Tapped puck: show state name, time in state, current target, and lines to
   target and support ally.
 - Status line: count of pucks in each state per side.
@@ -303,8 +317,9 @@ Combat mode is a match setting:
   and lines to its Engaged target (when any) and support ally. Prey (green),
   predator (red), counter ally (cyan), and defend ally (violet) lines remain
   when those exist.
-- State marker legend in the UI panel (Hunting empty, Engaged solid team,
-  Retreating amber, Regrouping hollow, Advancing white).
+- State and shape legend in the UI panel. States: Hunting empty, Engaged
+  solid team, Retreating amber, Regrouping hollow, Advancing white. Shapes:
+  rock circle, paper square, scissors triangle.
 - Controls: pause (button or Space), 1x, 4x, restart with same seed, restart
   with new seed, combat mode selector, and the R / P / S spawn row from
   section 7.

@@ -100,12 +100,15 @@ app.innerHTML = `
         <option value="instant_kill">Instant kill</option>
         <option value="convert">Convert</option>
       </select>
-      <div class="state-legend" aria-label="State marker legend">
+      <div class="state-legend" aria-label="State and shape legend">
         <span><i class="leg-hunt"></i>Hunt</span>
         <span><i class="leg-eng"></i>Engage</span>
         <span><i class="leg-ret"></i>Retreat</span>
         <span><i class="leg-reg"></i>Regroup</span>
         <span><i class="leg-adv"></i>Advance</span>
+        <span><i class="leg-circle"></i>Rock</span>
+        <span><i class="leg-square"></i>Paper</span>
+        <span><i class="leg-tri"></i>Scissors</span>
       </div>
     </div>
     <div class="spawn-bar">
@@ -401,9 +404,11 @@ canvas.addEventListener(
   { passive: false },
 )
 
+let dpr = 1
+
 function resize(): void {
   const stage = canvas.parentElement!
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  dpr = Math.min(window.devicePixelRatio || 1, 2)
   const w = stage.clientWidth
   const h = stage.clientHeight
   canvas.width = Math.max(1, Math.floor(w * dpr))
@@ -528,7 +533,7 @@ function frame(ts: number): void {
     selectedId = null
   }
 
-  drawFrame(ctx, match, pucks, camera, selectedId)
+  drawFrame(ctx, match, pucks, camera, selectedId, dpr)
   updateStatus()
   updateSpawnControls()
   updateInspect()

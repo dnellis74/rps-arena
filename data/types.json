@@ -1,6 +1,7 @@
 {
   "rock": {
     "glyph": "R",
+    "shape": "circle",
     "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
@@ -10,6 +11,7 @@
   },
   "paper": {
     "glyph": "P",
+    "shape": "square",
     "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
@@ -19,6 +21,7 @@
   },
   "scissors": {
     "glyph": "S",
+    "shape": "triangle",
     "hp": 12,
     "speed": 4.0,
     "radius": 0.5,
