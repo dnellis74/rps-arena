@@ -8,6 +8,7 @@ import {
   queueSpawn,
   randomSeed,
   snapshotPucks,
+  spawnZoneCenter,
   stepMatch,
   type CombatMode,
   type Match,
@@ -20,6 +21,7 @@ import {
   minimapLayout,
   minimapScreenToWorld,
   panByScreen,
+  readableScale,
   screenToWorld,
   setViewport,
   zoomAt,
@@ -405,6 +407,7 @@ canvas.addEventListener(
 )
 
 let dpr = 1
+let openedOnSpawn = false
 
 function resize(): void {
   const stage = canvas.parentElement!
@@ -413,7 +416,13 @@ function resize(): void {
   const h = stage.clientHeight
   canvas.width = Math.max(1, Math.floor(w * dpr))
   canvas.height = Math.max(1, Math.floor(h * dpr))
-  setViewport(camera, canvas.width, canvas.height)
+  setViewport(camera, canvas.width, canvas.height, dpr)
+  if (!openedOnSpawn && w >= 32 && h >= 32) {
+    openedOnSpawn = true
+    camera.scale = readableScale(camera)
+    const zone = spawnZoneCenter(data.tuning, 0)
+    centerOn(camera, zone.x, zone.y)
+  }
 }
 
 window.addEventListener('resize', resize)

@@ -115,6 +115,11 @@ export function drawFrame(
     tracePuckBody(ctx, c.x, c.y, r, p.shape, p.team)
     ctx.fillStyle = TEAM_FILL[p.team]
     ctx.fill()
+    ctx.lineJoin = 'miter'
+    ctx.miterLimit = 2
+    ctx.lineWidth = 2 * dpr
+    ctx.strokeStyle = 'rgba(8, 10, 16, 0.9)'
+    ctx.stroke()
 
     if (selectedId === p.id) {
       ctx.setLineDash([])

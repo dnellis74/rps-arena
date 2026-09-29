@@ -14,7 +14,7 @@
   "fixedDt": 0.016666666666666666,
   "attackOverFlee": 1.25,
   "standoffDistance": 4.0,
-  "maxZoomInPucksAcross": 16,
+  "maxZoomInPucksAcross": 8,
   "counterAllyBias": 0.85,
   "engageRadius": 2.0,
   "engageMaxTime": 4.0,

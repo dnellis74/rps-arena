@@ -18,6 +18,8 @@ export type Camera = {
   /** Puck diameter in world units (2 × radius). */
   puckDiameter: number
   maxZoomInPucksAcross: number
+  /** Canvas backing-store pixels per CSS pixel. Tests leave this at 1. */
+  dpr: number
 }
 
 export type Vec2 = { x: number; y: number }
@@ -40,6 +42,7 @@ export function createCamera(opts: {
     arenaH: opts.arenaH,
     puckDiameter: opts.puckDiameter,
     maxZoomInPucksAcross: opts.maxZoomInPucksAcross,
+    dpr: 1,
   }
   cam.scale = zoomOutScale(cam)
   clampCamera(cam)
@@ -65,9 +68,30 @@ export function zoomInScale(cam: Camera): number {
   return candidate < fit ? fit : candidate
 }
 
-export function setViewport(cam: Camera, viewportW: number, viewportH: number): void {
+/** Opening view: a puck at least this many CSS pixels across, when zoom allows. */
+export const READABLE_PUCK_CSS = 40
+
+/**
+ * Scale for the opening view. Clamped to the zoom limits. Viewport pixels are
+ * device pixels, so CSS size is divided by `dpr`.
+ */
+export function readableScale(cam: Camera): number {
+  const fit = zoomOutScale(cam)
+  const close = zoomInScale(cam)
+  if (cam.puckDiameter <= 0) return fit
+  const want = (READABLE_PUCK_CSS * cam.dpr) / cam.puckDiameter
+  return Math.max(fit, Math.min(close, want))
+}
+
+export function setViewport(
+  cam: Camera,
+  viewportW: number,
+  viewportH: number,
+  dpr = cam.dpr,
+): void {
   cam.viewportW = viewportW
   cam.viewportH = viewportH
+  cam.dpr = dpr > 0 ? dpr : 1
   cam.scale = clamp(cam.scale, zoomOutScale(cam), zoomInScale(cam))
   clampCamera(cam)
 }

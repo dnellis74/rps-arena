@@ -221,10 +221,12 @@ puck state, then returns a desired direction.
 
 ### Visible state
 
-- The puck body is its type shape, filled with the team color: circle, square,
-  or equilateral triangle. The three shapes are scaled to about the same filled
-  area, not the same circumradius. The triangle points toward the enemy spawn
-  zone: up for Team A, down for Team B. A missing or unknown shape is a circle.
+- The puck body is its type shape, filled with the team color and edged with
+  a dark outline so the silhouette stays visible around the glyph: circle,
+  square, or equilateral triangle. The three shapes are scaled to about the
+  same filled area, not the same circumradius. The triangle points toward the
+  enemy spawn zone: up for Team A, down for Team B. A missing or unknown shape
+  is a circle.
 - The glyph is always drawn, in white, at 1.2 times the collision radius in
   device pixels. Shape and team color still identify the type when the letter
   is small.
@@ -336,7 +338,11 @@ Combat mode is a match setting:
 - Zoom out limit: the whole arena fits in the viewport, centered, with empty
   bands on the sides that do not match the viewport's aspect ratio (letterbox).
 - Zoom in limit: the viewport's short side shows `maxZoomInPucksAcross` puck
-  diameters. Value in `data/tuning.json`, default 16.
+  diameters. Value in `data/tuning.json`, default 8.
+- The match opens centered on Team A's spawn, zoomed so a puck is about 40 CSS
+  px across, or at the zoom-in limit when the screen cannot give it that size.
+  Pinch out still fits the whole arena. At that fit view a puck is about 8 CSS
+  px across on a phone, and the shapes are no longer distinct.
 - If the zoom-in limit would be wider than the fit view, the zoom-in limit
   equals the fit view (no zoom available).
 - Zoom anchors on the pinch midpoint or cursor position: the world point under
