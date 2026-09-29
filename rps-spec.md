@@ -26,6 +26,9 @@ v0 includes camera zoom and pan (spectator view only).
   Both zones are drawn in team color.
 - All randomness comes from one seeded PRNG. The seed is shown on screen and
   can be set with `?seed=` in the URL.
+- Two lines split the field into three equal horizontal bands. The band that
+  touches a side's spawn is that side's defend third. The far band is its
+  attack third. Team B's thirds are the reverse of Team A's.
 
 ## 3. Types (data-driven)
 
@@ -163,6 +166,28 @@ further state changes are blocked until `1 / maxStateChangesPerSecond`
 seconds have elapsed. Retargeting within the same state (for example Engaged
 switching targets) does not count as a state change.
 
+#### Field thirds
+
+The state machine above is the middle-third behavior. The defend and attack
+thirds override it. A puck uses the third it is standing in.
+
+Defend third (the band touching its own spawn):
+- Any enemy in that band, prey, same-tier, or predator, is contested. The puck
+  moves toward the nearest one and does not leave to advance while an enemy
+  remains in the band.
+- When the band has no enemies, the puck enters Advancing and moves toward
+  the enemy spawn.
+
+Attack third (the band touching the enemy spawn):
+- Only prey is attacked. Same-tier enemies are avoided, not engaged.
+- Gang-up is off. A predator is answered only inside `attackZoneRadius`.
+- Prey beyond `attackZoneRadius` is ignored. An Engaged target farther than
+  that, or a target that is not prey, is dropped and the puck returns to
+  Advancing.
+- The puck prefers Advancing. Hunt, engage, and threat-enter distances in this
+  third are `attackZoneRadius` (default 2) instead of the normal radii. Threat
+  exit scales by the usual exit/enter ratio.
+
 #### New tuning parameters (defaults)
 
 | Parameter | Default |
@@ -178,6 +203,7 @@ switching targets) does not count as a state change.
 | teamLeadHysteresis | 10% of total max HP on both sides' seen HP |
 | maxStateChangesPerSecond | 2 |
 | huntRadius | 8.0 |
+| attackZoneRadius | 2.0 |
 | spawnZoneRadius | 1.0 |
 | chargeInterval | 3.0 s |
 | chargeCap | null (no cap) |

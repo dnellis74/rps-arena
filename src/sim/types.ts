@@ -78,6 +78,11 @@ export type TuningData = {
   maxStateChangesPerSecond: number
   /** Hunting tracks prey only inside this distance. */
   huntRadius: number
+  /**
+   * In the attack third, hunt, engage, and threat distances collapse to this.
+   * Same-tier enemies inside it are avoided. Prey beyond it is ignored.
+   */
+  attackZoneRadius: number
   /** Radius of each side's spawn-zone circle. */
   spawnZoneRadius: number
   /** Seconds between charge gains. */

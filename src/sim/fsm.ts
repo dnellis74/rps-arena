@@ -12,6 +12,64 @@ import { recordTransition, type EcsWorld } from './world.ts'
 
 export type Intent = { x: number; y: number }
 
+export type FieldBand = 'home' | 'mid' | 'attack'
+
+type ZoneRules = {
+  band: FieldBand
+  huntRadius: number
+  engageRadius: number
+  threatEnterRadius: number
+  threatExitRadius: number
+  sameTierEngage: boolean
+  gangUp: boolean
+}
+
+/** Horizontal third for this team. Home touches its spawn; attack is the far third. */
+export function fieldBand(team: 0 | 1, y: number, arenaHeight: number): FieldBand {
+  const u = arenaHeight > 0 ? y / arenaHeight : 0
+  const low = u < 1 / 3
+  const high = u > 2 / 3
+  if (team === 0) {
+    if (low) return 'home'
+    if (high) return 'attack'
+    return 'mid'
+  }
+  if (high) return 'home'
+  if (low) return 'attack'
+  return 'mid'
+}
+
+function zoneRules(
+  tuning: EcsWorld['tuning'],
+  band: FieldBand,
+): ZoneRules {
+  if (band !== 'attack') {
+    return {
+      band,
+      huntRadius: tuning.huntRadius,
+      engageRadius: tuning.engageRadius,
+      threatEnterRadius: tuning.threatEnterRadius,
+      threatExitRadius: tuning.threatExitRadius,
+      sameTierEngage: true,
+      gangUp: true,
+    }
+  }
+  const close = tuning.attackZoneRadius
+  const exit =
+    tuning.threatEnterRadius > 0
+      ? close * (tuning.threatExitRadius / tuning.threatEnterRadius)
+      : close
+  return {
+    band,
+    huntRadius: close,
+    engageRadius: close,
+    threatEnterRadius: close,
+    threatExitRadius: exit,
+    sameTierEngage: false,
+    gangUp: false,
+  }
+}
+
 /**
  * Advance one puck's state machine and return its movement intent.
  * Rendering must never call this — only the sim step.
@@ -39,15 +97,69 @@ export function stepPuckFsm(
 
   const losing = components.TeamLead[eid]! < 0
   const support = supportAlly(obs, damage, losing)
+  const band = fieldBand(obs.team, obs.y, world.tuning.arenaHeight)
+  const rules = zoneRules(world.tuning, band)
 
-  applyTransitions(world, eid, obs, damage, support)
+  if (band === 'home') applyHome(world, eid, obs)
+  else applyTransitions(world, eid, obs, damage, support, rules)
 
   const state = components.State[eid]! as PuckStateId
   components.TimeInState[eid]! += dt
   world.stateMetrics.timeInState[state]! += dt
   world.stateMetrics.puckSeconds += dt
 
-  return intentForState(world, eid, obs, support)
+  if (band === 'home') return homeIntent(world, eid, obs)
+  const intent = intentForState(world, eid, obs, support, rules)
+  if (band !== 'attack') return intent
+  let move = intent
+  if (components.State[eid] === PuckStates.Engaged) {
+    const targetId = components.TargetEid[eid]!
+    const engagedPrey = obs.prey.find((p) => p.id === targetId)
+    if (!engagedPrey || engagedPrey.dist > rules.engageRadius) {
+      move = advanceIntent(world, eid)
+    }
+  }
+  const peer = nearestWithin(obs.sameTier, rules.threatEnterRadius)
+  const prey = nearestWithin(obs.prey, rules.engageRadius)
+  if (peer && !(prey && prey.dist <= peer.dist)) return avoidPeer(move, peer)
+  return move
+}
+
+function applyHome(world: EcsWorld, eid: number, obs: Observation): void {
+  const foes = foesInHome(obs, world.tuning.arenaHeight)
+  if (foes.length === 0) {
+    enter(world, eid, PuckStates.Advancing, -1, 'home:clear')
+    return
+  }
+  enter(world, eid, PuckStates.Engaged, foes[0]!.id, 'home:contest')
+}
+
+function homeIntent(world: EcsWorld, eid: number, obs: Observation): Intent {
+  const foes = foesInHome(obs, world.tuning.arenaHeight)
+  const foe = foes[0]
+  if (!foe) return advanceIntent(world, eid)
+  return { x: foe.dx, y: foe.dy }
+}
+
+/** Enemies standing in this team's home third, nearest first. */
+function foesInHome(obs: Observation, arenaHeight: number): SeenEntity[] {
+  const foes: SeenEntity[] = []
+  for (const list of [obs.prey, obs.predators, obs.sameTier]) {
+    for (const e of list) {
+      if (fieldBand(obs.team, obs.y + e.dy, arenaHeight) === 'home') foes.push(e)
+    }
+  }
+  foes.sort((a, b) => a.dist - b.dist)
+  return foes
+}
+
+function avoidPeer(intent: Intent, peer: SeenEntity): Intent {
+  const il = Math.hypot(intent.x, intent.y) || 1
+  const pl = Math.hypot(peer.dx, peer.dy) || 1
+  return {
+    x: intent.x / il - (1.5 * peer.dx) / pl,
+    y: intent.y / il - (1.5 * peer.dy) / pl,
+  }
 }
 
 function applyTransitions(
@@ -56,31 +168,46 @@ function applyTransitions(
   obs: Observation,
   damage: DamageMatrix,
   support: SeenEntity | null,
+  rules: ZoneRules,
 ): void {
   const { components, tuning, types } = world
 
-  const gang = gangUpTarget(
-    obs,
-    damage,
-    types,
-    tuning,
-    components.TeamLead[eid]! > 0,
-  )
-  if (gang) {
-    enter(world, eid, PuckStates.Engaged, gang.id, 'any:gangup')
-    return
+  if (rules.band === 'attack') {
+    const targetId = components.TargetEid[eid]!
+    const stateNow = components.State[eid]! as PuckStateId
+    if (stateNow === PuckStates.Engaged) {
+      const prey = obs.prey.find((p) => p.id === targetId)
+      if (!prey || prey.dist > rules.engageRadius) {
+        enter(world, eid, PuckStates.Advancing, -1, 'attack:disengage')
+        return
+      }
+    }
+  }
+
+  if (rules.gangUp) {
+    const gang = gangUpTarget(
+      obs,
+      damage,
+      types,
+      tuning,
+      components.TeamLead[eid]! > 0,
+    )
+    if (gang) {
+      enter(world, eid, PuckStates.Engaged, gang.id, 'any:gangup')
+      return
+    }
   }
 
   const state = components.State[eid]! as PuckStateId
 
   if (state === PuckStates.Hunting) {
-    if (respondToPredator(world, eid, obs, 'hunting')) return
-    const engage = nearestEngageCandidate(obs, tuning.engageRadius)
+    if (respondToPredator(world, eid, obs, 'hunting', rules)) return
+    const engage = nearestEngageCandidate(obs, rules.engageRadius, rules.sameTierEngage)
     if (engage && canEnterEngaged(world, eid)) {
       enter(world, eid, PuckStates.Engaged, engage.id, 'hunting:engage')
       return
     }
-    const prey = nearestWithin(obs.prey, tuning.huntRadius)
+    const prey = nearestWithin(obs.prey, rules.huntRadius)
     if (!prey) {
       enter(world, eid, PuckStates.Advancing, -1, 'hunting:noPrey')
     }
@@ -101,7 +228,7 @@ function applyTransitions(
       enter(world, eid, PuckStates.Regrouping, -1, 'engaged:timeout')
       return
     }
-    const pred = nearestWithin(obs.predators, tuning.threatEnterRadius)
+    const pred = nearestWithin(obs.predators, rules.threatEnterRadius)
     if (pred && pred.id !== targetId) {
       const prey = obs.prey[0]
       if (!finishPreyApplies(pred, prey, tuning.attackOverFlee)) {
@@ -118,7 +245,7 @@ function applyTransitions(
       return
     }
     const nearestPred = obs.predators[0]
-    if (!nearestPred || nearestPred.dist > tuning.threatExitRadius) {
+    if (!nearestPred || nearestPred.dist > rules.threatExitRadius) {
       enter(world, eid, PuckStates.Regrouping, -1, 'retreating:clear')
       return
     }
@@ -126,7 +253,7 @@ function applyTransitions(
   }
 
   if (state === PuckStates.Regrouping) {
-    const pred = nearestWithin(obs.predators, tuning.threatEnterRadius)
+    const pred = nearestWithin(obs.predators, rules.threatEnterRadius)
     if (pred) {
       enter(world, eid, PuckStates.Retreating, -1, 'regrouping:predator')
       return
@@ -134,7 +261,7 @@ function applyTransitions(
     const prey = obs.prey[0]
     if (
       prey &&
-      prey.dist <= tuning.engageRadius &&
+      prey.dist <= rules.engageRadius &&
       canEnterEngaged(world, eid)
     ) {
       enter(world, eid, PuckStates.Engaged, prey.id, 'regrouping:engage')
@@ -147,8 +274,8 @@ function applyTransitions(
   }
 
   if (state === PuckStates.Advancing) {
-    if (respondToPredator(world, eid, obs, 'advancing')) return
-    const prey = nearestWithin(obs.prey, tuning.huntRadius)
+    if (respondToPredator(world, eid, obs, 'advancing', rules)) return
+    const prey = nearestWithin(obs.prey, rules.huntRadius)
     if (prey) {
       enter(world, eid, PuckStates.Hunting, -1, 'advancing:prey')
     }
@@ -160,6 +287,7 @@ function intentForState(
   eid: number,
   obs: Observation,
   support: SeenEntity | null,
+  rules: ZoneRules,
 ): Intent {
   const { components, tuning } = world
   const state = components.State[eid]! as PuckStateId
@@ -183,7 +311,7 @@ function intentForState(
       if (support) return { x: support.dx, y: support.dy }
       return { x: 0, y: 0 }
     }
-    const closeness = 1 - Math.min(1, pred.dist / tuning.threatEnterRadius)
+    const closeness = 1 - Math.min(1, pred.dist / rules.threatEnterRadius)
     const weight = 1 + closeness * closeness * 4
     const flee = { x: -pred.dx * weight, y: -pred.dy * weight }
     return blendToward(flee, support, tuning.counterAllyBias)
@@ -204,8 +332,8 @@ function intentForState(
 
   if (state === PuckStates.Advancing) return advanceIntent(world, eid)
 
-  // Hunting: only prey inside huntRadius.
-  const hunted = nearestWithin(obs.prey, tuning.huntRadius)
+  // Hunting: only prey inside the zone's hunt radius.
+  const hunted = nearestWithin(obs.prey, rules.huntRadius)
   if (hunted) return { x: hunted.dx, y: hunted.dy }
   return advanceIntent(world, eid)
 }
@@ -226,8 +354,9 @@ function respondToPredator(
   eid: number,
   obs: Observation,
   from: 'hunting' | 'advancing',
+  rules: ZoneRules,
 ): boolean {
-  const pred = nearestWithin(obs.predators, world.tuning.threatEnterRadius)
+  const pred = nearestWithin(obs.predators, rules.threatEnterRadius)
   if (!pred) return false
   const prey = obs.prey[0]
   if (finishPreyApplies(pred, prey, world.tuning.attackOverFlee)) {
@@ -294,12 +423,14 @@ function finishPreyApplies(
 function nearestEngageCandidate(
   obs: Observation,
   engageRadius: number,
+  sameTierEngage: boolean,
 ): SeenEntity | null {
   let best: SeenEntity | null = null
   for (const p of obs.prey) {
     if (p.dist > engageRadius) break
     if (!best || p.dist < best.dist) best = p
   }
+  if (!sameTierEngage) return best
   for (const s of obs.sameTier) {
     if (s.dist > engageRadius) break
     if (obs.hp <= s.band.high) continue

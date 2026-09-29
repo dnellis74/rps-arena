@@ -27,6 +27,7 @@
   "teamLeadHysteresis": 0.1,
   "maxStateChangesPerSecond": 2,
   "huntRadius": 8,
+  "attackZoneRadius": 2,
   "spawnZoneRadius": 1,
   "chargeInterval": 3,
   "chargeCap": null,
